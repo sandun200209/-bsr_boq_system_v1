@@ -16,6 +16,11 @@ import {
   REVISION_OPTIONS,
   DATASET_TYPES,
   VAT_BASIS_OPTIONS,
+  SECTORS,
+  RATE_SYSTEMS,
+  SECTOR_RATE_SYSTEM_MAP,
+  SECTOR_CATEGORY_PRESETS,
+  SECTOR_BADGE_CLASSES,
 } from '../constants/sriLanka';
 
 interface ImportCenterPageProps {
@@ -28,6 +33,8 @@ export const ImportCenterPage: React.FC<ImportCenterPageProps> = ({
   onRefreshMetrics,
 }) => {
   // Form State
+  const [sector, setSector] = useState<string>('Building Works');
+  const [rateSystem, setRateSystem] = useState<string>('BSR');
   const [province, setProvince] = useState<string>('Southern');
   const [district, setDistrict] = useState<string>('Matara');
   const [year, setYear] = useState<number>(new Date().getFullYear());
@@ -44,6 +51,12 @@ export const ImportCenterPage: React.FC<ImportCenterPageProps> = ({
   const [result, setResult] = useState<any | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleSectorChange = (newSec: string) => {
+    setSector(newSec);
+    const systems = SECTOR_RATE_SYSTEM_MAP[newSec] || ['BSR'];
+    setRateSystem(systems[0]);
+  };
 
   // When province changes, update district default to first valid district
   const handleProvinceChange = (newProv: string) => {
@@ -90,6 +103,8 @@ export const ImportCenterPage: React.FC<ImportCenterPageProps> = ({
       setUploadProgress(20);
 
       const formData = new FormData();
+      formData.append('sector', sector);
+      formData.append('rate_system', rateSystem);
       formData.append('province', province);
       formData.append('district', district);
       formData.append('year', year.toString());
@@ -151,9 +166,48 @@ export const ImportCenterPage: React.FC<ImportCenterPageProps> = ({
           Document Metadata Specification
         </h3>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-5">
+          {/* Infrastructure Sector */}
+          <div className="md:col-span-3">
+            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+              <span>Infrastructure Sector <span className="text-rose-500">*</span></span>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${SECTOR_BADGE_CLASSES[sector] || 'bg-slate-100 text-slate-700'}`}>
+                {sector.split(' ')[0]}
+              </span>
+            </label>
+            <select
+              value={sector}
+              onChange={(e) => handleSectorChange(e.target.value)}
+              className="w-full text-sm rounded-lg border border-slate-300 py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white font-medium text-slate-800"
+            >
+              {SECTORS.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Rate System (Dependent) */}
+          <div className="md:col-span-3">
+            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+              Rate System <span className="text-rose-500">*</span>
+            </label>
+            <select
+              value={rateSystem}
+              onChange={(e) => setRateSystem(e.target.value)}
+              className="w-full text-sm rounded-lg border border-slate-300 py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white font-medium text-slate-800"
+            >
+              {(SECTOR_RATE_SYSTEM_MAP[sector] || RATE_SYSTEMS).map((rs) => (
+                <option key={rs} value={rs}>
+                  {rs}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Province */}
-          <div>
+          <div className="md:col-span-2">
             <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
               Province <span className="text-rose-500">*</span>
             </label>
@@ -171,7 +225,7 @@ export const ImportCenterPage: React.FC<ImportCenterPageProps> = ({
           </div>
 
           {/* District (Cascading) */}
-          <div>
+          <div className="md:col-span-2">
             <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
               District <span className="text-rose-500">*</span>
             </label>
@@ -189,7 +243,7 @@ export const ImportCenterPage: React.FC<ImportCenterPageProps> = ({
           </div>
 
           {/* Year */}
-          <div>
+          <div className="md:col-span-2">
             <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
               Year <span className="text-rose-500">*</span>
             </label>
@@ -204,7 +258,7 @@ export const ImportCenterPage: React.FC<ImportCenterPageProps> = ({
           </div>
 
           {/* Revision */}
-          <div>
+          <div className="md:col-span-2">
             <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
               Revision <span className="text-rose-500">*</span>
             </label>
@@ -222,7 +276,7 @@ export const ImportCenterPage: React.FC<ImportCenterPageProps> = ({
           </div>
 
           {/* Dataset Type */}
-          <div>
+          <div className="md:col-span-2">
             <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
               Dataset Type <span className="text-rose-500">*</span>
             </label>
@@ -240,7 +294,7 @@ export const ImportCenterPage: React.FC<ImportCenterPageProps> = ({
           </div>
 
           {/* VAT Basis */}
-          <div>
+          <div className="md:col-span-2">
             <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
               VAT Basis <span className="text-rose-500">*</span>
             </label>
@@ -258,17 +312,32 @@ export const ImportCenterPage: React.FC<ImportCenterPageProps> = ({
           </div>
 
           {/* Category Hint (Optional) */}
-          <div className="md:col-span-3">
+          <div className="md:col-span-6">
             <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
               Category Hint (Optional)
             </label>
             <input
               type="text"
-              placeholder="e.g. Earth Work, Concrete Work, or leave blank to auto-detect"
+              placeholder={`e.g. ${(SECTOR_CATEGORY_PRESETS[sector] || ['General Works']).slice(0, 2).join(', ')}, or leave blank to auto-detect`}
               value={categoryHint}
               onChange={(e) => setCategoryHint(e.target.value)}
               className="w-full text-sm rounded-lg border border-slate-300 py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white"
             />
+            {SECTOR_CATEGORY_PRESETS[sector] && (
+              <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                <span className="text-[11px] text-slate-400 font-medium">Standard {sector.split(' ')[0]} categories:</span>
+                {SECTOR_CATEGORY_PRESETS[sector].slice(0, 5).map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setCategoryHint(cat)}
+                    className="text-[11px] px-2 py-0.5 bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-600 rounded-md transition-colors"
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

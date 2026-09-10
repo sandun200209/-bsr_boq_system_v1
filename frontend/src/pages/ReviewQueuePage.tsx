@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { api } from '../api/client';
 import { RateItem } from '../types';
+import { SECTORS, SECTOR_BADGE_CLASSES } from '../constants/sriLanka';
 
 interface ReviewQueuePageProps {
   initialFileId?: number;
@@ -22,6 +23,7 @@ export const ReviewQueuePage: React.FC<ReviewQueuePageProps> = ({
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [statusFilter, setStatusFilter] = useState<string>('NEEDS_REVIEW');
+  const [sectorFilter, setSectorFilter] = useState<string>('');
   const [editingItem, setEditingItem] = useState<RateItem | null>(null);
 
   // Edit Form Fields
@@ -30,12 +32,14 @@ export const ReviewQueuePage: React.FC<ReviewQueuePageProps> = ({
   const [editUnit, setEditUnit] = useState<string>('');
   const [editRate, setEditRate] = useState<string>('');
   const [editCategory, setEditCategory] = useState<string>('');
+  const [editSector, setEditSector] = useState<string>('Building Works');
 
   const loadQueue = async () => {
     try {
       setLoading(true);
       const res = await api.getReviewQueue({
         source_file_id: initialFileId,
+        sector: sectorFilter || undefined,
         status: statusFilter === 'ALL' ? undefined : statusFilter,
         page_size: 100,
       });
@@ -50,7 +54,7 @@ export const ReviewQueuePage: React.FC<ReviewQueuePageProps> = ({
 
   useEffect(() => {
     loadQueue();
-  }, [statusFilter, initialFileId]);
+  }, [statusFilter, sectorFilter, initialFileId]);
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
@@ -106,6 +110,7 @@ export const ReviewQueuePage: React.FC<ReviewQueuePageProps> = ({
     setEditUnit(item.unit || '');
     setEditRate(item.rate !== null && item.rate !== undefined ? item.rate.toString() : '');
     setEditCategory(item.category_name || '');
+    setEditSector(item.sector || 'Building Works');
   };
 
   const saveEdit = async () => {
@@ -117,6 +122,7 @@ export const ReviewQueuePage: React.FC<ReviewQueuePageProps> = ({
         unit: editUnit,
         rate: parseFloat(editRate) || 0,
         category_name: editCategory,
+        sector: editSector,
         validation_status: 'VALID',
         validation_notes: null,
       });
@@ -142,9 +148,20 @@ export const ReviewQueuePage: React.FC<ReviewQueuePageProps> = ({
         {/* Action Buttons */}
         <div className="flex items-center gap-3 flex-wrap">
           <select
+            value={sectorFilter}
+            onChange={(e) => setSectorFilter(e.target.value)}
+            className="text-xs rounded-lg border border-slate-300 py-2 px-3 bg-white focus:outline-none focus:ring-2 focus:ring-blue-600 font-medium text-slate-800"
+          >
+            <option value="">All Sectors</option>
+            {SECTORS.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+
+          <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="text-xs rounded-lg border border-slate-300 py-2 px-3 bg-white focus:outline-none focus:ring-2 focus:ring-blue-600"
+            className="text-xs rounded-lg border border-slate-300 py-2 px-3 bg-white focus:outline-none focus:ring-2 focus:ring-blue-600 font-medium"
           >
             <option value="NEEDS_REVIEW">Needs Review</option>
             <option value="VALID">Valid (Pending Approval)</option>
@@ -279,6 +296,18 @@ export const ReviewQueuePage: React.FC<ReviewQueuePageProps> = ({
                       {/* Description */}
                       <td className="py-3 px-4 text-slate-900 leading-relaxed">
                         <div className="font-medium">{item.description}</div>
+                        <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                          {item.sector && (
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold border ${SECTOR_BADGE_CLASSES[item.sector] || 'bg-slate-100 text-slate-700'}`}>
+                              {item.rate_system || item.sector.split(' ')[0]}
+                            </span>
+                          )}
+                          {item.category_name && (
+                            <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-semibold">
+                              {item.category_name}
+                            </span>
+                          )}
+                        </div>
                         {item.raw_text && item.raw_text !== item.description && (
                           <div className="text-[10px] text-slate-400 font-mono mt-1 truncate max-w-sm" title={item.raw_text}>
                             Raw: {item.raw_text}
@@ -404,14 +433,29 @@ export const ReviewQueuePage: React.FC<ReviewQueuePageProps> = ({
                 </div>
               </div>
 
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Category</label>
-                <input
-                  type="text"
-                  value={editCategory}
-                  onChange={(e) => setEditCategory(e.target.value)}
-                  className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Category</label>
+                  <input
+                    type="text"
+                    value={editCategory}
+                    onChange={(e) => setEditCategory(e.target.value)}
+                    className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Sector</label>
+                  <select
+                    value={editSector}
+                    onChange={(e) => setEditSector(e.target.value)}
+                    className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 bg-white"
+                  >
+                    {SECTORS.map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
 

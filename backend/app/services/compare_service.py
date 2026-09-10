@@ -72,6 +72,8 @@ class CompareService:
                     CompareRowOut(
                         id=it.id,
                         source_file_id=it.source_file_id,
+                        sector=it.sector or "Building Works",
+                        rate_system=it.rate_system or "BSR",
                         province=it.province,
                         district=it.district,
                         year=it.year,

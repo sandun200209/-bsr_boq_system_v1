@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { api } from '../api/client';
 import { RateItem, FilterOptions } from '../types';
+import { SECTORS, RATE_SYSTEMS, SECTOR_BADGE_CLASSES } from '../constants/sriLanka';
 
 interface RateSearchPageProps {
   initialFilters?: any;
@@ -27,6 +28,8 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
   // Query & Filters
   const [searchTerm, setSearchTerm] = useState<string>(initialFilters?.q || '');
   const [debouncedSearch, setDebouncedSearch] = useState<string>(initialFilters?.q || '');
+  const [sector, setSector] = useState<string>(initialFilters?.sector || '');
+  const [rateSystem, setRateSystem] = useState<string>(initialFilters?.rate_system || '');
   const [province, setProvince] = useState<string>(initialFilters?.province || '');
   const [district, setDistrict] = useState<string>(initialFilters?.district || '');
   const [year, setYear] = useState<string>(initialFilters?.year ? String(initialFilters.year) : '');
@@ -78,6 +81,8 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
       setLoading(true);
       const res = await api.searchRates({
         q: debouncedSearch || undefined,
+        sector: sector || undefined,
+        rate_system: rateSystem || undefined,
         province: province || undefined,
         district: district || undefined,
         year: year ? parseInt(year) : undefined,
@@ -101,7 +106,7 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, province, district, year, revision, datasetType, vatBasis, category, status, pageNumber, sheet, sortBy, sortOrder, page, pageSize]);
+  }, [debouncedSearch, sector, rateSystem, province, district, year, revision, datasetType, vatBasis, category, status, pageNumber, sheet, sortBy, sortOrder, page, pageSize]);
 
   useEffect(() => {
     fetchRates();
@@ -254,6 +259,8 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
 
   const resetFilters = () => {
     setSearchTerm('');
+    setSector('');
+    setRateSystem('');
     setProvince('');
     setDistrict('');
     setYear('');
@@ -312,7 +319,33 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
           </button>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9 gap-2.5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-11 gap-2.5">
+          {/* Sector */}
+          <select
+            value={sector}
+            onChange={(e) => { setSector(e.target.value); setPage(1); }}
+            className="text-xs rounded-lg border border-slate-300 py-1.5 px-2 bg-white focus:outline-none focus:ring-1 focus:ring-blue-600 font-medium text-slate-800 truncate"
+            title={sector || 'All Sectors'}
+          >
+            <option value="">All Sectors</option>
+            {(filterOpts?.sectors || SECTORS).map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+
+          {/* Rate System */}
+          <select
+            value={rateSystem}
+            onChange={(e) => { setRateSystem(e.target.value); setPage(1); }}
+            className="text-xs rounded-lg border border-slate-300 py-1.5 px-2 bg-white focus:outline-none focus:ring-1 focus:ring-blue-600 font-medium text-slate-800 truncate"
+            title={rateSystem || 'All Systems'}
+          >
+            <option value="">All Systems</option>
+            {(filterOpts?.rate_systems || RATE_SYSTEMS).map((rs) => (
+              <option key={rs} value={rs}>{rs}</option>
+            ))}
+          </select>
+
           {/* Province */}
           <select
             value={province}
@@ -592,11 +625,18 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
                     {/* Description */}
                     <td className="py-3 px-4 text-slate-900 leading-relaxed font-normal">
                       <div className="font-medium">{item.description}</div>
-                      {item.category_name && (
-                        <span className="inline-block mt-1 px-2 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-semibold">
-                          {item.category_name}
-                        </span>
-                      )}
+                      <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                        {item.sector && (
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold border ${SECTOR_BADGE_CLASSES[item.sector] || 'bg-slate-100 text-slate-700'}`}>
+                            {item.rate_system || item.sector.split(' ')[0]}
+                          </span>
+                        )}
+                        {item.category_name && (
+                          <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-semibold">
+                            {item.category_name}
+                          </span>
+                        )}
+                      </div>
                     </td>
 
                     {/* Unit */}

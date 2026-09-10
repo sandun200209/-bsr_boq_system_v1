@@ -59,8 +59,10 @@ export const api = {
       body: formData,
     }),
 
-  getDocuments: (params?: { province?: string; district?: string; year?: number; skip?: number; limit?: number }) => {
+  getDocuments: (params?: { sector?: string; rate_system?: string; province?: string; district?: string; year?: number; skip?: number; limit?: number }) => {
     const q = new URLSearchParams();
+    if (params?.sector) q.set('sector', params.sector);
+    if (params?.rate_system) q.set('rate_system', params.rate_system);
     if (params?.province) q.set('province', params.province);
     if (params?.district) q.set('district', params.district);
     if (params?.year) q.set('year', params.year.toString());
@@ -76,6 +78,8 @@ export const api = {
 
   searchRates: (params: {
     q?: string;
+    sector?: string;
+    rate_system?: string;
     province?: string;
     district?: string;
     year?: number;
@@ -110,6 +114,8 @@ export const api = {
 
   // Compare
   getCompare: (params: {
+    sector?: string;
+    rate_system?: string;
     provinces?: string[];
     districts?: string[];
     years?: number[];
@@ -117,9 +123,13 @@ export const api = {
     category?: string;
     vat_basis?: string;
     q?: string;
+    master_item_id?: number;
     base_item_id?: number;
+    limit?: number;
   }) => {
     const q = new URLSearchParams();
+    if (params.sector) q.set('sector', params.sector);
+    if (params.rate_system) q.set('rate_system', params.rate_system);
     params.provinces?.forEach((p) => q.append('provinces', p));
     params.districts?.forEach((d) => q.append('districts', d));
     params.years?.forEach((y) => q.append('years', y.toString()));
@@ -127,13 +137,17 @@ export const api = {
     if (params.category) q.set('category', params.category);
     if (params.vat_basis) q.set('vat_basis', params.vat_basis);
     if (params.q) q.set('q', params.q);
+    if (params.master_item_id) q.set('master_item_id', params.master_item_id.toString());
     if (params.base_item_id) q.set('base_item_id', params.base_item_id.toString());
+    if (params.limit) q.set('limit', params.limit.toString());
     return request<CompareResponse>(`/compare?${q.toString()}`);
   },
 
   // Review Queue
   getReviewQueue: (params?: {
     source_file_id?: number;
+    sector?: string;
+    rate_system?: string;
     status?: string;
     category?: string;
     page?: number;
@@ -177,9 +191,11 @@ export const api = {
     ),
 
   // Master Items
-  getMasterItems: (params?: { q?: string; category?: string; skip?: number; limit?: number }) => {
+  getMasterItems: (params?: { q?: string; sector?: string; rate_system?: string; category?: string; skip?: number; limit?: number }) => {
     const q = new URLSearchParams();
     if (params?.q) q.set('q', params.q);
+    if (params?.sector) q.set('sector', params.sector);
+    if (params?.rate_system) q.set('rate_system', params.rate_system);
     if (params?.category) q.set('category', params.category);
     if (params?.skip !== undefined) q.set('skip', params.skip.toString());
     if (params?.limit !== undefined) q.set('limit', params.limit.toString());
@@ -193,6 +209,8 @@ export const api = {
     canonical_description: string;
     canonical_unit: string;
     category?: string;
+    sector?: string;
+    rate_system?: string;
     notes?: string;
   }) =>
     request<MasterItem>('/master-items', {

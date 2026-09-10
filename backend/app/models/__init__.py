@@ -24,6 +24,8 @@ class SourceFile(Base):
     dataset_type: Mapped[str] = mapped_column(String(80), default="BSR Rate Book", index=True)
     vat_basis: Mapped[str] = mapped_column(String(80), default="Without VAT", index=True)
     category_hint: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    sector: Mapped[str] = mapped_column(String(100), default="Building Works", server_default="Building Works", index=True)
+    rate_system: Mapped[str] = mapped_column(String(100), default="BSR", server_default="BSR", index=True)
 
     upload_status: Mapped[str] = mapped_column(String(40), default="UPLOADED", index=True)
     import_status: Mapped[str] = mapped_column(String(40), default="READY_FOR_REVIEW", index=True)
@@ -71,6 +73,8 @@ class MasterItem(Base):
     canonical_description: Mapped[str] = mapped_column(Text, nullable=False)
     canonical_unit: Mapped[str] = mapped_column(String(100), nullable=False)
     category: Mapped[str | None] = mapped_column(String(500), nullable=True, index=True)
+    sector: Mapped[str] = mapped_column(String(100), default="Building Works", server_default="Building Works", index=True)
+    rate_system: Mapped[str | None] = mapped_column(String(100), default="BSR", server_default="BSR", nullable=True, index=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
@@ -95,6 +99,8 @@ class RateItem(Base):
     revision: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
     dataset_type: Mapped[str] = mapped_column(String(80), default="BSR Rate Book", index=True)
     vat_basis: Mapped[str] = mapped_column(String(80), default="Without VAT", index=True)
+    sector: Mapped[str] = mapped_column(String(100), default="Building Works", server_default="Building Works", index=True)
+    rate_system: Mapped[str] = mapped_column(String(100), default="BSR", server_default="BSR", index=True)
 
     category_code: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     category_name: Mapped[str | None] = mapped_column(String(500), nullable=True, index=True)
@@ -161,3 +167,7 @@ Index(
 )
 Index("ix_rates_item_code_lower", RateItem.item_code)
 Index("ix_rates_status_filter", RateItem.validation_status)
+Index("ix_rate_items_sector_rate_system", RateItem.sector, RateItem.rate_system)
+Index("ix_rate_items_sector_prov_dist_year", RateItem.sector, RateItem.province, RateItem.district, RateItem.year)
+Index("ix_rate_items_system_year_cat", RateItem.rate_system, RateItem.year, RateItem.category_name)
+Index("ix_source_files_sector_rate_system", SourceFile.sector, SourceFile.rate_system)

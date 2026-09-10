@@ -11,6 +11,8 @@ class SourceFileBase(BaseModel):
     dataset_type: str = "BSR Rate Book"
     vat_basis: str = "Without VAT"
     category_hint: str | None = None
+    sector: str = "Building Works"
+    rate_system: str = "BSR"
 
 class SourceFileOut(SourceFileBase):
     model_config = ConfigDict(from_attributes=True)
@@ -73,6 +75,8 @@ class RateItemOut(BaseModel):
     updated_at: datetime
     verified_at: datetime | None
     original_filename: str | None = None
+    sector: str = "Building Works"
+    rate_system: str = "BSR"
 
 class RateItemUpdate(BaseModel):
     item_code: str | None = None
@@ -81,6 +85,8 @@ class RateItemUpdate(BaseModel):
     rate: float | None = None
     category_code: str | None = None
     category_name: str | None = None
+    sector: str | None = None
+    rate_system: str | None = None
     validation_status: str | None = None
     validation_notes: str | None = None
 
@@ -92,6 +98,8 @@ class RateItemSearchResponse(BaseModel):
     items: list[RateItemOut]
 
 class FilterOptionsResponse(BaseModel):
+    sectors: list[str] = []
+    rate_systems: list[str] = []
     provinces: list[str]
     districts: list[str]
     years: list[int]
@@ -100,6 +108,8 @@ class FilterOptionsResponse(BaseModel):
     vat_bases: list[str]
     categories: list[str]
     sheets: list[str] = []
+    sector_systems: dict[str, list[str]] = {}
+    category_presets: dict[str, list[str]] = {}
 
 # ----------------- Review Queue -----------------
 class ReviewBulkActionRequest(BaseModel):
@@ -110,6 +120,8 @@ class ReviewBulkActionRequest(BaseModel):
 class CompareRowOut(BaseModel):
     id: int
     source_file_id: int
+    sector: str = "Building Works"
+    rate_system: str = "BSR"
     province: str
     district: str
     year: int
@@ -146,6 +158,8 @@ class MasterItemBase(BaseModel):
     canonical_description: str
     canonical_unit: str
     category: str | None = None
+    sector: str = "Building Works"
+    rate_system: str | None = "BSR"
     notes: str | None = None
 
 class MasterItemCreate(MasterItemBase):
@@ -156,6 +170,8 @@ class MasterItemUpdate(BaseModel):
     canonical_description: str | None = None
     canonical_unit: str | None = None
     category: str | None = None
+    sector: str | None = None
+    rate_system: str | None = None
     notes: str | None = None
 
 class MasterItemOut(MasterItemBase):

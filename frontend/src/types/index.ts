@@ -13,6 +13,8 @@ export interface SourceFile {
   dataset_type: string;
   vat_basis: string;
   category_hint?: string | null;
+  sector: string;
+  rate_system: string;
   upload_status: string;
   import_status: string;
   uploaded_at: string;
@@ -26,6 +28,8 @@ export interface SourceFile {
 export interface RateItem {
   id: number;
   source_file_id: number;
+  sector: string;
+  rate_system: string;
   province: string;
   district: string;
   year: number;
@@ -54,6 +58,8 @@ export interface RateItem {
 }
 
 export interface FilterOptions {
+  sectors?: string[];
+  rate_systems?: string[];
   provinces: string[];
   districts: string[];
   years: number[];
@@ -62,11 +68,15 @@ export interface FilterOptions {
   vat_bases: string[];
   categories: string[];
   sheets?: string[];
+  sector_systems?: Record<string, string[]>;
+  category_presets?: Record<string, string[]>;
 }
 
 export interface CompareRow {
   id: number;
   source_file_id: number;
+  sector?: string;
+  rate_system?: string;
   province: string;
   district: string;
   year: number;
@@ -106,6 +116,8 @@ export interface MasterItem {
   canonical_description: string;
   canonical_unit: string;
   category?: string | null;
+  sector?: string;
+  rate_system?: string | null;
   notes?: string | null;
   created_at: string;
   updated_at: string;
@@ -130,5 +142,8 @@ export interface DashboardMetrics {
   districts_count: number;
   recent_uploads: SourceFile[];
   province_breakdown: { province: string; count: number }[];
+  sector_breakdown?: { sector: string; count: number }[];
+  rate_system_breakdown?: { rate_system: string; count: number }[];
+  sector_files_breakdown?: { sector: string; count: number }[];
   latest_revisions: { province: string; district: string; year: number; revision: string; files: number }[];
 }

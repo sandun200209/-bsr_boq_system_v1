@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { api } from '../api/client';
 import { MasterItem, MasterSuggestion } from '../types';
+import { SECTORS, RATE_SYSTEMS, SECTOR_RATE_SYSTEM_MAP, SECTOR_BADGE_CLASSES } from '../constants/sriLanka';
 
 export const MasterItemsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'registry' | 'suggestions'>('registry');
@@ -17,6 +18,7 @@ export const MasterItemsPage: React.FC = () => {
   const [selectedMaster, setSelectedMaster] = useState<MasterItem | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [sectorFilter, setSectorFilter] = useState<string>('');
 
   // Create Modal State
   const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
@@ -24,13 +26,18 @@ export const MasterItemsPage: React.FC = () => {
   const [newDesc, setNewDesc] = useState<string>('');
   const [newUnit, setNewUnit] = useState<string>('m³');
   const [newCategory, setNewCategory] = useState<string>('Brick Layer');
+  const [newSector, setNewSector] = useState<string>('Building Works');
+  const [newRateSystem, setNewRateSystem] = useState<string>('BSR');
   const [newNotes, setNewNotes] = useState<string>('');
 
   const loadData = async () => {
     try {
       setLoading(true);
       const [masters, suggs] = await Promise.all([
-        api.getMasterItems({ q: searchQuery || undefined }),
+        api.getMasterItems({
+          q: searchQuery || undefined,
+          sector: sectorFilter || undefined,
+        }),
         api.getMasterSuggestions(25),
       ]);
       setMasterItems(masters);
@@ -49,7 +56,7 @@ export const MasterItemsPage: React.FC = () => {
 
   useEffect(() => {
     loadData();
-  }, [searchQuery]);
+  }, [searchQuery, sectorFilter]);
 
   const selectMasterItem = async (id: number) => {
     try {
@@ -68,6 +75,8 @@ export const MasterItemsPage: React.FC = () => {
         canonical_description: newDesc,
         canonical_unit: newUnit,
         category: newCategory,
+        sector: newSector,
+        rate_system: newRateSystem,
         notes: newNotes,
       });
       setShowCreateModal(false);
@@ -151,15 +160,27 @@ export const MasterItemsPage: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Left Master Items List (1 col) */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-4 flex flex-col h-[650px]">
-            <div className="relative mb-3">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-              <input
-                type="text"
-                placeholder="Search master items..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-600 focus:outline-none"
-              />
+            <div className="flex gap-2 mb-3">
+              <select
+                value={sectorFilter}
+                onChange={(e) => setSectorFilter(e.target.value)}
+                className="w-1/3 py-1.5 px-2 text-xs rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none font-medium"
+              >
+                <option value="">All Sectors</option>
+                {SECTORS.map((s) => (
+                  <option key={s} value={s}>{s.split(' ')[0]}</option>
+                ))}
+              </select>
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2" />
+                <input
+                  type="text"
+                  placeholder="Search master items..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                />
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto space-y-2 pr-1">
@@ -185,7 +206,14 @@ export const MasterItemsPage: React.FC = () => {
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-mono font-bold text-blue-700">{master.master_code}</span>
+                        <div className="flex items-center gap-1.5">
+                          {master.sector && (
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold border ${SECTOR_BADGE_CLASSES[master.sector] || 'bg-slate-100 text-slate-700'}`}>
+                              {master.rate_system || master.sector.split(' ')[0]}
+                            </span>
+                          )}
+                          <span className="font-mono font-bold text-blue-700">{master.master_code}</span>
+                        </div>
                         <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] font-semibold">
                           {master.mapped_count} mapped
                         </span>
@@ -366,6 +394,37 @@ export const MasterItemsPage: React.FC = () => {
             </h3>
 
             <div className="space-y-3 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Sector</label>
+                  <select
+                    value={newSector}
+                    onChange={(e) => {
+                      setNewSector(e.target.value);
+                      const sys = SECTOR_RATE_SYSTEM_MAP[e.target.value] || ['BSR'];
+                      setNewRateSystem(sys[0]);
+                    }}
+                    className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 bg-white"
+                  >
+                    {SECTORS.map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Rate System</label>
+                  <select
+                    value={newRateSystem}
+                    onChange={(e) => setNewRateSystem(e.target.value)}
+                    className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 bg-white"
+                  >
+                    {(SECTOR_RATE_SYSTEM_MAP[newSector] || RATE_SYSTEMS).map((rs) => (
+                      <option key={rs} value={rs}>{rs}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">Master Code</label>
                 <input

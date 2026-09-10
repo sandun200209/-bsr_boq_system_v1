@@ -60,6 +60,67 @@ class Settings(BaseSettings):
         "Not Applicable"
     ]
 
+    SUPPORTED_SECTORS: list[str] = [
+        "Building Works",
+        "Highway / Road Works",
+        "Water Supply Works",
+        "Sewerage Works",
+        "Storm Water Drainage Works",
+        "Other"
+    ]
+
+    SUPPORTED_RATE_SYSTEMS: list[str] = [
+        "BSR",
+        "HSR",
+        "Water Supply Rates",
+        "Sewerage & Storm Water Drainage Works",
+        "Other / Custom"
+    ]
+
+    SECTOR_RATE_SYSTEM_MAP: dict[str, list[str]] = {
+        "Building Works": ["BSR"],
+        "Highway / Road Works": ["HSR"],
+        "Water Supply Works": ["Water Supply Rates"],
+        "Sewerage Works": ["Sewerage & Storm Water Drainage Works"],
+        "Storm Water Drainage Works": ["Sewerage & Storm Water Drainage Works"],
+        "Other": ["Other / Custom", "BSR", "HSR", "Water Supply Rates", "Sewerage & Storm Water Drainage Works"]
+    }
+
+    SECTOR_CATEGORY_PRESETS: dict[str, list[str]] = {
+        "Building Works": [
+            "Demolition & Alterations", "Earthwork & Excavation", "Concrete Work", 
+            "Masonry & Brickwork", "Roofing & Cladding", "Carpentry & Joinery", 
+            "Plumbing & Drainage", "Electrical Installation", "Floor & Wall Finishes", 
+            "Painting & Decorating", "Metalwork & Ironmongery", "External Works"
+        ],
+        "Highway / Road Works": [
+            "Site Clearing & Earthwork", "Subbase, Base & Shoulder Construction", 
+            "Bituminous Surfacing & Asphalt", "Road Drainage Structures", 
+            "Bridges & Precast Culverts", "Traffic Safety, Signs & Road Marking", 
+            "Retaining Walls & Gabions", "Incidental Road Works"
+        ],
+        "Water Supply Works": [
+            "Ductile Iron (DI) Pipes & Fittings", "HDPE / MDPE Pipes & Fittings", 
+            "uPVC Pipes & Pressure Fittings", "Valves, Hydrants & Flow Meters", 
+            "Pumping Machinery, Motors & Controls", "Water Treatment Plant Equipment", 
+            "Ground & Elevated Water Reservoirs", "Customer Service Connections", 
+            "Hydrostatic Pressure Testing & Disinfection"
+        ],
+        "Sewerage Works": [
+            "Gravity Sewer Collection Mains", "Sewer Manholes & Drop Chambers", 
+            "Wastewater Pumping Stations & Force Mains", "Screening & Grit Chambers", 
+            "Aeration, Sedimentation & Treatment Tanks", "Sludge Dewatering & Drying Beds", 
+            "Odor Control Systems & Effluent Disposal"
+        ],
+        "Storm Water Drainage Works": [
+            "Open Lined & Unlined Surface Drains", "Precast Concrete U-Drains & Covers", 
+            "Box Culverts & Circular Pipe Culverts", "Inlet Pits, Catch Basins & Gullies", 
+            "Channel Excavation & River Training", "Flood Retention Basins & Sluice Gates", 
+            "Erosion Control & Gabion Mattresses"
+        ],
+        "Other": ["General Works", "Provisional Sums", "Prime Cost Items", "Miscellaneous"]
+    }
+
     model_config = SettingsConfigDict(env_file=".env", extra="allow")
 
 settings = Settings()

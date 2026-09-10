@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func, or_, desc, asc, text
 from sqlalchemy.orm import Session
 
+from ..config import settings
 from ..database import get_db
 from ..models import RateItem, SourceFile
 from ..schemas import RateItemOut, RateItemSearchResponse, FilterOptionsResponse
@@ -13,6 +14,12 @@ router = APIRouter(prefix="/rates", tags=["Rates"])
 @router.get("/filters", response_model=FilterOptionsResponse)
 def get_filter_options(db: Session = Depends(get_db)):
     """Returns available distinct filter values across all stored rate items."""
+    sectors_db = db.scalars(
+        select(RateItem.sector).distinct().where(RateItem.sector.isnot(None)).order_by(RateItem.sector)
+    ).all()
+    rate_systems_db = db.scalars(
+        select(RateItem.rate_system).distinct().where(RateItem.rate_system.isnot(None)).order_by(RateItem.rate_system)
+    ).all()
     provinces = db.scalars(
         select(RateItem.province).distinct().where(RateItem.province.isnot(None)).order_by(RateItem.province)
     ).all()
@@ -38,7 +45,13 @@ def get_filter_options(db: Session = Depends(get_db)):
         select(RateItem.source_sheet).distinct().where(RateItem.source_sheet.isnot(None)).order_by(RateItem.source_sheet)
     ).all()
 
+    # Merge with supported defaults so user can select empty sectors too
+    all_sectors = list(dict.fromkeys(list(sectors_db) + settings.SUPPORTED_SECTORS))
+    all_systems = list(dict.fromkeys(list(rate_systems_db) + settings.SUPPORTED_RATE_SYSTEMS))
+
     return FilterOptionsResponse(
+        sectors=all_sectors,
+        rate_systems=all_systems,
         provinces=list(provinces),
         districts=list(districts),
         years=list(years),
@@ -47,11 +60,15 @@ def get_filter_options(db: Session = Depends(get_db)):
         vat_bases=list(vat_bases),
         categories=list(categories),
         sheets=list(sheets),
+        sector_systems=settings.SECTOR_RATE_SYSTEM_MAP,
+        category_presets=settings.SECTOR_CATEGORY_PRESETS,
     )
 
 @router.get("/search", response_model=RateItemSearchResponse)
 def search_rates(
     q: str | None = Query(None, description="Keywords, item code, description or partial search"),
+    sector: str | None = Query(None),
+    rate_system: str | None = Query(None),
     province: str | None = Query(None),
     district: str | None = Query(None),
     year: int | None = Query(None),
@@ -71,6 +88,10 @@ def search_rates(
     query = select(RateItem).join(SourceFile, RateItem.source_file_id == SourceFile.id)
 
     # Filtering
+    if sector:
+        query = query.where(RateItem.sector == sector)
+    if rate_system:
+        query = query.where(RateItem.rate_system == rate_system)
     if province:
         query = query.where(RateItem.province == province)
     if district:

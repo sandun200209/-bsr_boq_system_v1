@@ -10,10 +10,12 @@ import {
 } from 'lucide-react';
 import { api } from '../api/client';
 import { CompareResponse, FilterOptions } from '../types';
-import { PROVINCE_LIST } from '../constants/sriLanka';
+import { PROVINCE_LIST, SECTORS, RATE_SYSTEMS, SECTOR_RATE_SYSTEM_MAP, SECTOR_BADGE_CLASSES } from '../constants/sriLanka';
 
 export const CompareRatesPage: React.FC = () => {
   // Filters
+  const [sector, setSector] = useState<string>('Building Works');
+  const [rateSystem, setRateSystem] = useState<string>('BSR');
   const [selectedProvinces, setSelectedProvinces] = useState<string[]>([]);
   const [selectedYears, setSelectedYears] = useState<number[]>([]);
   const [category, setCategory] = useState<string>('');
@@ -29,10 +31,18 @@ export const CompareRatesPage: React.FC = () => {
     api.getFilterOptions().then(setFilterOpts).catch(console.error);
   }, []);
 
+  const handleSectorChange = (newSec: string) => {
+    setSector(newSec);
+    const systems = SECTOR_RATE_SYSTEM_MAP[newSec] || ['BSR'];
+    setRateSystem(systems[0]);
+  };
+
   const loadComparison = async () => {
     try {
       setLoading(true);
       const res = await api.getCompare({
+        sector: sector || undefined,
+        rate_system: rateSystem || undefined,
         provinces: selectedProvinces.length > 0 ? selectedProvinces : undefined,
         years: selectedYears.length > 0 ? selectedYears : undefined,
         category: category || undefined,
@@ -49,7 +59,7 @@ export const CompareRatesPage: React.FC = () => {
 
   useEffect(() => {
     loadComparison();
-  }, [selectedProvinces, selectedYears, category, baseItemId]);
+  }, [sector, rateSystem, selectedProvinces, selectedYears, category, baseItemId]);
 
   const toggleProvince = (prov: string) => {
     setSelectedProvinces((prev) =>
@@ -74,6 +84,42 @@ export const CompareRatesPage: React.FC = () => {
           <Filter className="w-3.5 h-3.5 text-blue-600" />
           <span>Comparison Parameters</span>
         </h3>
+
+        {/* Sector & Rate System Selector */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-slate-50/80 rounded-xl border border-slate-200">
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+              <span>Sector Scope</span>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${SECTOR_BADGE_CLASSES[sector] || 'bg-slate-100 text-slate-700'}`}>
+                {sector}
+              </span>
+            </label>
+            <select
+              value={sector}
+              onChange={(e) => handleSectorChange(e.target.value)}
+              className="w-full text-xs font-medium rounded-lg border border-slate-300 py-2 px-3 bg-white focus:outline-none focus:ring-2 focus:ring-blue-600"
+            >
+              {SECTORS.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+              Rate System
+            </label>
+            <select
+              value={rateSystem}
+              onChange={(e) => setRateSystem(e.target.value)}
+              className="w-full text-xs font-medium rounded-lg border border-slate-300 py-2 px-3 bg-white focus:outline-none focus:ring-2 focus:ring-blue-600"
+            >
+              {(SECTOR_RATE_SYSTEM_MAP[sector] || RATE_SYSTEMS).map((rs) => (
+                <option key={rs} value={rs}>{rs}</option>
+              ))}
+            </select>
+          </div>
+        </div>
 
         {/* Multi-Province Selector Chips */}
         <div>

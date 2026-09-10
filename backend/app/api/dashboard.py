@@ -46,6 +46,30 @@ def get_dashboard_metrics(db: Session = Depends(get_db)):
         for r in revisions_raw
     ]
 
+    # Sector breakdown
+    sector_counts_raw = db.execute(
+        select(RateItem.sector, func.count(RateItem.id))
+        .group_by(RateItem.sector)
+        .order_by(desc(func.count(RateItem.id)))
+    ).all()
+    sector_breakdown = [{"sector": s or "Unknown", "count": c} for s, c in sector_counts_raw]
+
+    # Rate System breakdown
+    system_counts_raw = db.execute(
+        select(RateItem.rate_system, func.count(RateItem.id))
+        .group_by(RateItem.rate_system)
+        .order_by(desc(func.count(RateItem.id)))
+    ).all()
+    rate_system_breakdown = [{"rate_system": rs or "Unknown", "count": c} for rs, c in system_counts_raw]
+
+    # Sector files breakdown
+    sector_files_raw = db.execute(
+        select(SourceFile.sector, func.count(SourceFile.id))
+        .group_by(SourceFile.sector)
+        .order_by(desc(func.count(SourceFile.id)))
+    ).all()
+    sector_files_breakdown = [{"sector": s or "Unknown", "count": c} for s, c in sector_files_raw]
+
     return {
         "total_rate_items": total_rate_items,
         "approved_items": approved_items,
@@ -55,5 +79,8 @@ def get_dashboard_metrics(db: Session = Depends(get_db)):
         "districts_count": districts_count,
         "recent_uploads": recent_uploads,
         "province_breakdown": province_breakdown,
+        "sector_breakdown": sector_breakdown,
+        "rate_system_breakdown": rate_system_breakdown,
+        "sector_files_breakdown": sector_files_breakdown,
         "latest_revisions": latest_revisions,
     }

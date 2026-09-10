@@ -12,6 +12,8 @@ router = APIRouter(prefix="/compare", tags=["Compare"])
 
 @router.get("", response_model=CompareResponse)
 def compare_rates(
+    sector: str | None = Query(None),
+    rate_system: str | None = Query(None),
     provinces: list[str] = Query(None),
     districts: list[str] = Query(None),
     years: list[int] = Query(None),
@@ -36,6 +38,11 @@ def compare_rates(
             RateItem.rate > 0,
         )
     )
+
+    if sector:
+        query = query.where(RateItem.sector == sector)
+    if rate_system:
+        query = query.where(RateItem.rate_system == rate_system)
 
     if master_item_id:
         query = query.where(RateItem.master_item_id == master_item_id)

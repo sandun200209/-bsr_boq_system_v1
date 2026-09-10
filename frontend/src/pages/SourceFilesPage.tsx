@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { api } from '../api/client';
 import { SourceFile } from '../types';
+import { SECTORS, SECTOR_BADGE_CLASSES } from '../constants/sriLanka';
 
 interface SourceFilesPageProps {
   onNavigateToReview?: (fileId: number) => void;
@@ -16,12 +17,16 @@ export const SourceFilesPage: React.FC<SourceFilesPageProps> = ({
   onNavigateToReview,
 }) => {
   const [files, setFiles] = useState<SourceFile[]>([]);
+  const [sectorFilter, setSectorFilter] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
 
   const loadFiles = async () => {
     try {
       setLoading(true);
-      const data = await api.getDocuments({ limit: 100 });
+      const data = await api.getDocuments({
+        sector: sectorFilter || undefined,
+        limit: 100,
+      });
       setFiles(data);
     } catch (err) {
       console.error('Failed to load source documents:', err);
@@ -32,7 +37,7 @@ export const SourceFilesPage: React.FC<SourceFilesPageProps> = ({
 
   useEffect(() => {
     loadFiles();
-  }, []);
+  }, [sectorFilter]);
 
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-6">
@@ -44,13 +49,26 @@ export const SourceFilesPage: React.FC<SourceFilesPageProps> = ({
           </p>
         </div>
 
-        <button
-          onClick={loadFiles}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-white border border-slate-300 rounded-lg hover:bg-slate-50 shadow-xs"
-        >
-          <RefreshCw className="w-3.5 h-3.5" />
-          <span>Refresh Files</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <select
+            value={sectorFilter}
+            onChange={(e) => setSectorFilter(e.target.value)}
+            className="text-xs rounded-lg border border-slate-300 py-1.5 px-2.5 bg-white focus:outline-none focus:ring-1 focus:ring-blue-600 font-medium text-slate-800"
+          >
+            <option value="">All Sectors</option>
+            {SECTORS.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+
+          <button
+            onClick={loadFiles}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-white border border-slate-300 rounded-lg hover:bg-slate-50 shadow-xs"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>Refresh</span>
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
@@ -88,8 +106,15 @@ export const SourceFilesPage: React.FC<SourceFilesPageProps> = ({
                   <tr key={file.id} className="hover:bg-slate-50 transition-colors">
                     {/* Filename & Hash */}
                     <td className="py-3.5 px-4">
-                      <div className="font-bold text-slate-900 text-sm truncate max-w-sm" title={file.original_filename}>
-                        {file.original_filename}
+                      <div className="flex items-center gap-2">
+                        <div className="font-bold text-slate-900 text-sm truncate max-w-sm" title={file.original_filename}>
+                          {file.original_filename}
+                        </div>
+                        {file.sector && (
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold border ${SECTOR_BADGE_CLASSES[file.sector] || 'bg-slate-100 text-slate-700'}`}>
+                            {file.rate_system || file.sector.split(' ')[0]}
+                          </span>
+                        )}
                       </div>
                       <div className="text-[11px] text-slate-500 font-mono mt-0.5">
                         {(file.file_size / (1024 * 1024)).toFixed(2)} MB • {file.file_type.toUpperCase()}

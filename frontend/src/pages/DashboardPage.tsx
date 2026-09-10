@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { api } from '../api/client';
 import { DashboardMetrics } from '../types';
+import { SECTORS, SECTOR_RATE_SYSTEM_MAP, SECTOR_BADGE_CLASSES } from '../constants/sriLanka';
 
 interface DashboardPageProps {
   onNavigate: (tab: string) => void;
@@ -185,6 +186,51 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
           <div className="text-xs text-amber-600 font-medium mt-1 flex items-center gap-1">
             <span>Inspect queue &rarr;</span>
           </div>
+        </div>
+      </div>
+
+      {/* Multi-Sector Rate Hub Coverage */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-6 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+          <div>
+            <h3 className="text-base font-bold text-slate-900">Multi-Sector Rate Hub Coverage</h3>
+            <p className="text-xs text-slate-500">Live inventory across Building (BSR), Highway (HSR), Water Supply & Drainage works</p>
+          </div>
+          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 w-fit">
+            4 Core Infrastructure Sectors
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {SECTORS.slice(0, 4).map((sec) => {
+            const count = metrics.sector_breakdown?.find((b) => b.sector === sec)?.count || 0;
+            const fileCount = metrics.sector_files_breakdown?.find((b) => b.sector === sec)?.count || 0;
+            const system = (SECTOR_RATE_SYSTEM_MAP[sec] || ['BSR'])[0];
+            return (
+              <div
+                key={sec}
+                onClick={() => onNavigate('search')}
+                className="p-4 rounded-xl border border-slate-200 hover:border-blue-400 bg-slate-50/50 hover:bg-blue-50/20 transition-all cursor-pointer group"
+              >
+                <div className="flex items-center justify-between">
+                  <span className={`text-[10px] px-2 py-0.5 rounded font-semibold border ${SECTOR_BADGE_CLASSES[sec] || 'bg-slate-100 text-slate-700'}`}>
+                    {system}
+                  </span>
+                  <span className="text-xs text-slate-400 group-hover:text-blue-600 font-medium">&rarr;</span>
+                </div>
+                <div className="text-sm font-bold text-slate-800 mt-2 truncate" title={sec}>
+                  {sec}
+                </div>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="text-xl font-extrabold text-slate-900">{count.toLocaleString()}</span>
+                  <span className="text-xs text-slate-500">rates</span>
+                </div>
+                <div className="text-[11px] text-slate-400 mt-1">
+                  {fileCount} {fileCount === 1 ? 'document' : 'documents'}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 

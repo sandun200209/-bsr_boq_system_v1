@@ -14,6 +14,8 @@ router = APIRouter(prefix="/review", tags=["Review Queue"])
 @router.get("", response_model=dict)
 def get_review_queue(
     source_file_id: int | None = Query(None),
+    sector: str | None = Query(None),
+    rate_system: str | None = Query(None),
     status: str | None = Query("NEEDS_REVIEW", description="VALID, NEEDS_REVIEW, REJECTED, APPROVED, or ALL"),
     category: str | None = Query(None),
     page: int = Query(1, ge=1),
@@ -24,6 +26,10 @@ def get_review_queue(
 
     if source_file_id:
         query = query.where(RateItem.source_file_id == source_file_id)
+    if sector:
+        query = query.where(RateItem.sector == sector)
+    if rate_system:
+        query = query.where(RateItem.rate_system == rate_system)
     if status and status.upper() != "ALL":
         query = query.where(RateItem.validation_status == status.upper())
     if category:
@@ -74,6 +80,12 @@ def update_review_item(rate_id: int, payload: RateItemUpdate, db: Session = Depe
 
     if payload.category_name is not None:
         item.category_name = payload.category_name.strip()
+
+    if payload.sector is not None:
+        item.sector = payload.sector.strip()
+
+    if payload.rate_system is not None:
+        item.rate_system = payload.rate_system.strip()
 
     if payload.validation_status is not None:
         item.validation_status = payload.validation_status.upper()

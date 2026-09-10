@@ -24,6 +24,8 @@ def upload_document(
     dataset_type: str = Form("BSR Rate Book"),
     vat_basis: str = Form("Without VAT"),
     category_hint: str | None = Form(None),
+    sector: str = Form("Building Works"),
+    rate_system: str = Form("BSR"),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
 ):
@@ -75,6 +77,8 @@ def upload_document(
         dataset_type=dataset_type.strip(),
         vat_basis=vat_basis.strip(),
         category_hint=category_hint.strip() if category_hint else None,
+        sector=sector.strip() if sector else "Building Works",
+        rate_system=rate_system.strip() if rate_system else "BSR",
         upload_status="UPLOADED",
         import_status="PROCESSING",
     )
@@ -152,6 +156,8 @@ def upload_document(
                 revision=item_rev,
                 dataset_type=item_dst,
                 vat_basis=item_vat,
+                sector=doc.sector,
+                rate_system=doc.rate_system,
                 category_code=item.category_code[:250] if item.category_code else None,
                 category_name=item.category_name[:490] if item.category_name else None,
                 item_code=item.item_code[:250] if item.item_code else None,
@@ -207,6 +213,8 @@ def upload_document(
 
 @router.get("", response_model=list[SourceFileOut])
 def list_documents(
+    sector: str | None = Query(None),
+    rate_system: str | None = Query(None),
     province: str | None = Query(None),
     district: str | None = Query(None),
     year: int | None = Query(None),
@@ -215,6 +223,10 @@ def list_documents(
     db: Session = Depends(get_db),
 ):
     query = select(SourceFile)
+    if sector:
+        query = query.where(SourceFile.sector == sector)
+    if rate_system:
+        query = query.where(SourceFile.rate_system == rate_system)
     if province:
         query = query.where(SourceFile.province == province)
     if district:

@@ -20,12 +20,18 @@ router = APIRouter(prefix="/master-items", tags=["Master Items"])
 @router.get("", response_model=list[MasterItemOut])
 def list_master_items(
     q: str | None = Query(None),
+    sector: str | None = Query(None),
+    rate_system: str | None = Query(None),
     category: str | None = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
 ):
     query = select(MasterItem)
+    if sector:
+        query = query.where(MasterItem.sector == sector)
+    if rate_system:
+        query = query.where(MasterItem.rate_system == rate_system)
     if q and q.strip():
         term = f"%{q.strip()}%"
         query = query.where(
@@ -58,6 +64,8 @@ def create_master_item(payload: MasterItemCreate, db: Session = Depends(get_db))
         canonical_description=payload.canonical_description.strip(),
         canonical_unit=payload.canonical_unit.strip(),
         category=payload.category.strip() if payload.category else None,
+        sector=payload.sector.strip() if payload.sector else "Building Works",
+        rate_system=payload.rate_system.strip() if payload.rate_system else "BSR",
         notes=payload.notes.strip() if payload.notes else None,
     )
     db.add(item)
@@ -96,6 +104,10 @@ def update_master_item(item_id: int, payload: MasterItemUpdate, db: Session = De
         item.canonical_unit = payload.canonical_unit.strip()
     if payload.category is not None:
         item.category = payload.category.strip() or None
+    if payload.sector is not None:
+        item.sector = payload.sector.strip()
+    if payload.rate_system is not None:
+        item.rate_system = payload.rate_system.strip()
     if payload.notes is not None:
         item.notes = payload.notes.strip() or None
 
