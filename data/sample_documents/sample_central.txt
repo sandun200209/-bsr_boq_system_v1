@@ -1,0 +1,4 @@
+BR-04	Brickwork in 225 mm 1:5 cement sand mortar	m3	31600.00
+EX-02	Excavation in trench ordinary soil	m3	1320.00
+RC-01	1:2:4 concrete in foundation	m3	25200.00
+ST-05	Tor steel reinforcement	kg	392.00

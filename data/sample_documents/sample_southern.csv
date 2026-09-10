@@ -1,0 +1,10 @@
+Code,Description,Unit,Rate
+DM01,Demolishing existing brick walls and carting away,m3,596.00
+BK01,Brickwork in 225 mm 1:5 cement sand mortar,m3,30616.00
+EW01,Excavation in ordinary soil up to 1.5m depth,m3,1250.00
+CT01,1:2:4 reinforced concrete in foundations,m3,24500.00
+RF01,Tor steel reinforcement bars 10mm to 16mm,kg,385.00
+PL01,16mm thick 1:4 cement sand plaster to internal walls,m2,1450.00
+PT01,Two coats emulsion paint on plastered walls,m2,420.00
+BK02,Brickwork in 112 mm thick 1:4 cement mortar,m2,3850.00
+BAD01,Incomplete item without rate,m3,

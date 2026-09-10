@@ -1,0 +1,48 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: bsr_postgres
+    environment:
+      POSTGRES_DB: bsr_boq
+      POSTGRES_USER: bsr_user
+      POSTGRES_PASSWORD: bsr_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bsr_user -d bsr_boq"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: bsr_backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://bsr_user:bsr_password@postgres:5432/bsr_boq
+      UPLOAD_DIR: /data/uploads
+    volumes:
+      - ./data/uploads:/data/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: bsr_frontend
+    ports:
+      - "0.0.0.0:8080:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
