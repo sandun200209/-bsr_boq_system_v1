@@ -17,49 +17,53 @@
 
 ---
 
-## 🚀 Quick Start Guide (Windows)
+## 🚀 Quick Setup on Any Windows PC or Laptop
 
-### Prerequisites
-1. **Windows 10 or 11 (64-bit)**
-2. **Docker Desktop for Windows**  
-   If you don't have Docker Desktop installed, download and install it from:  
-   👉 [https://www.docker.com/products/docker-desktop/](https://www.docker.com/products/docker-desktop/)  
-   *(Make sure Docker Desktop is started and shows a green "Engine running" icon in your system tray).*
+See the full [**Complete Setup & Installation Guide (SETUP_GUIDE.md)**](SETUP_GUIDE.md) for detailed instructions.
 
----
-
-### Step 1: Launch the System
-1. Open the project folder in Windows File Explorer:
-   ```
-   C:\Users\SANDUN\Downloads\bsr_boq_system_v1
-   ```
+### 🌟 1. Setting Up on a New PC or Laptop (1-Click Installer)
+1. Copy or extract this folder to the target laptop (e.g. `C:\BSR_Rate_Hub` or `Downloads`).
 2. **Double-click** on:
+   ```cmd
+   INSTALL_ON_NEW_PC.bat
    ```
-   start_windows.bat
-   ```
-3. A command window will appear. It will automatically:
-   - Check if Docker Desktop is running.
-   - Create persistent folders (`data/uploads` and `data/backups`).
-   - Build and start PostgreSQL 16, the FastAPI backend, and Nginx/React frontend.
-   - Run database schema migrations (`alembic upgrade head`).
-   - Automatically open your default web browser to:
-     ```
-     http://localhost:8080
-     ```
+   *(Also available as `setup_this_pc.bat`)*
+3. The automated installer will:
+   - Check if Docker Desktop is installed (and offer to download/install it automatically if missing).
+   - Start the container engines (PostgreSQL, FastAPI backend, Nginx frontend).
+   - Synchronize all database tables and load pre-existing rate items.
+   - **Create a Desktop Shortcut** ("BSR Rate Hub") on your Windows Desktop.
+   - Configure Windows Firewall for office network sharing.
+   - Open your browser to `http://localhost:8080`.
 
 ---
 
-## 🛑 How to Stop, Restart, and Manage
+### 💾 2. 100% Offline USB Setup (No Internet Needed)
+For remote construction sites or PCs without high-speed internet:
+1. **On your source PC**: Double-click `export_offline_package.bat` to export all Docker images (~450MB) and rates into `offline_bundle/`.
+2. **Copy folder to USB**: Copy the folder to a USB drive and plug it into the target laptop.
+3. **On the target laptop**: Double-click `install_offline.bat`. Everything loads and starts in under 30 seconds with **zero internet required**!
 
-All management scripts are located directly in the project folder for easy double-clicking:
+---
+
+## 🛑 How to Run, Stop, and Manage
+
+All control scripts are located directly in the root folder for easy double-clicking:
 
 | Action | Script to Run / Double-Click | Description |
 | :--- | :--- | :--- |
+| **New PC Installer** | `INSTALL_ON_NEW_PC.bat` | Automated 1-click installer and dependency setup wizard. |
 | **Start / Launch** | `start_windows.bat` | Starts all services, runs migrations, and opens your browser. |
-| **Stop System** | `stop_windows.bat` | Safely stops containers. Database and uploaded files remain intact. |
+| **Create Desktop Icon** | `create_desktop_shortcut.bat` | Places a "BSR Rate Hub" shortcut on your Windows Desktop. |
+| **Stop System** | `stop_windows.bat` | Safely stops containers. Database and files remain safely intact. |
 | **Restart** | `restart_windows.bat` | Reboots all containers quickly. |
-| **Backup Everything** | `backup_database.bat` | Generates a timestamped SQL dump and copies all uploaded documents to `data/backups/`. |
+| **Export Offline USB** | `export_offline_package.bat` | Creates a portable offline installation package on USB. |
+| **Install Offline** | `install_offline.bat` | Installs and launches the offline bundle in 30 seconds (no internet). |
+| **Office LAN Firewall** | `allow_firewall_lan.bat` | Configures Windows Firewall so coworkers can connect over Wi-Fi. |
+| **Show Office IP** | `show_lan_address.bat` | Displays the network URL for other laptops (e.g. `http://192.168.1.15:8080`). |
+| **Backup Everything** | `backup_database.bat` | Generates a timestamped SQL dump and source file backup. |
 | **Restore Database** | `restore_database.bat` | Restores database tables from a specified `.sql` backup file. |
+| **Fresh Database Reset**| `reset_database.bat` | Creates an auto-backup and resets to a clean empty database. |
 
 ---
 
