@@ -59,6 +59,8 @@ All control scripts are located directly in the root folder for easy double-clic
 | **Restart** | `restart_windows.bat` | Reboots all containers quickly. |
 | **Export Offline USB** | `export_offline_package.bat` | Creates a portable offline installation package on USB. |
 | **Install Offline** | `install_offline.bat` | Installs and launches the offline bundle in 30 seconds (no internet). |
+| **Export Data Update**| `export_data_update.bat` | Exports a small ZIP of new documents & rates to share with another laptop. |
+| **Import Data Update**| `import_data_update.bat` | Imports an update ZIP from another PC into this laptop. |
 | **Office LAN Firewall** | `allow_firewall_lan.bat` | Configures Windows Firewall so coworkers can connect over Wi-Fi. |
 | **Show Office IP** | `show_lan_address.bat` | Displays the network URL for other laptops (e.g. `http://192.168.1.15:8080`). |
 | **Backup Everything** | `backup_database.bat` | Generates a timestamped SQL dump and source file backup. |

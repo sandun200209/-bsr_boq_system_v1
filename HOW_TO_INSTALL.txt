@@ -55,10 +55,10 @@ Once installed:
 
 
 ================================================================================
-  HOW TO SHARE WITH OTHER PCS / LAPTOPS IN YOUR OFFICE (OFFICE LAN)
+  SCENARIO 1: REAL-TIME SHARING IN SAME OFFICE (OFFICE LAN / WI-FI)
 ================================================================================
-You DO NOT need to install anything on your colleagues' laptops!
-One PC acts as the server, and everyone in the office can connect via Wi-Fi:
+When PC 1 uploads documents, other laptops on the same office Wi-Fi can
+access and see the uploaded documents and details immediately in real-time!
 
 1. On the host PC (where BSR Rate Hub is installed), double-click:
       allow_firewall_lan.bat
@@ -66,8 +66,29 @@ One PC acts as the server, and everyone in the office can connect via Wi-Fi:
 2. It will display your PC's network address, for example:
       http://192.168.1.15:8080
 
-3. Any coworker on the same office Wi-Fi can open Chrome or Edge and type
-   that address to search rates, compare provincial costs, and create BOQs!
+3. On any other laptop or PC on the same office Wi-Fi:
+   Open Chrome or Edge and navigate to: http://192.168.1.15:8080
+   -> Every document uploaded on PC 1 appears instantly on Laptop 2!
+   -> No installation required on Laptop 2!
+
+
+================================================================================
+  SCENARIO 2: SYNC DATA & DOCUMENTS BETWEEN 2 SEPARATE PCS (OFFLINE / REMOTE SITE)
+================================================================================
+When PC 1 and Laptop 2 are in DIFFERENT locations (e.g. Head Office & Remote Site):
+
+ON PC 1 (WHERE YOU UPLOADED DOCUMENTS):
+  1. Double-click: export_data_update.bat
+  2. A lightweight ZIP file is created in 'data_updates\', e.g.:
+        data_updates\BSR_Data_Update_20260914_130000.zip
+  3. Send this ZIP via WhatsApp, email, or copy to a USB drive.
+
+ON LAPTOP 2 (WHERE YOU WANT TO SEE THE DATA):
+  1. Copy the ZIP file to the Laptop's 'bsr_boq_system_v1' folder.
+  2. Double-click: import_data_update.bat
+  3. All newly uploaded documents, rate updates, and master mappings from PC 1
+     are automatically imported!
+  4. Open http://localhost:8080 to view the updated data.
 
 
 ================================================================================
@@ -76,3 +97,4 @@ One PC acts as the server, and everyone in the office can connect via Wi-Fi:
 Open 'SETUP_GUIDE.md' or 'README.md' for complete documentation, hardware
 requirements, backup/restore instructions, and troubleshooting tips.
 ================================================================================
+
