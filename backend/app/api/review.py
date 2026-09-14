@@ -5,9 +5,10 @@ from sqlalchemy import select, func, desc, update
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import RateItem, SourceFile
+from ..models import RateItem, SourceFile, User
 from ..schemas import RateItemOut, RateItemUpdate, ReviewBulkActionRequest
 from ..services.validation_service import normalize_unit, detect_category_from_code
+from ..services.auth_service import get_current_user_optional, log_audit
 
 router = APIRouter(prefix="/review", tags=["Review Queue"])
 
@@ -56,55 +57,66 @@ def get_review_queue(
     }
 
 @router.patch("/{rate_id}", response_model=RateItemOut)
-def update_review_item(rate_id: int, payload: RateItemUpdate, db: Session = Depends(get_db)):
+def update_review_item(
+    rate_id: int,
+    payload: RateItemUpdate,
+    current_user: User | None = Depends(get_current_user_optional),
+    db: Session = Depends(get_db),
+):
+    if current_user and current_user.role == "VIEWER":
+        raise HTTPException(status_code=403, detail="Viewers have read-only permissions.")
+
     item = db.get(RateItem, rate_id)
     if not item:
         raise HTTPException(status_code=404, detail="Rate item not found")
 
     if payload.item_code is not None:
-        item.item_code = payload.item_code.strip() or None
-        cat_code, cat_name = detect_category_from_code(item.item_code, item.category_name)
-        if cat_code:
-            item.category_code = cat_code
-        if not item.category_name and cat_name:
-            item.category_name = cat_name
-
+        item.item_code = payload.item_code.strip()
     if payload.description is not None:
-        item.description = payload.description.strip() or None
-
+        item.description = payload.description.strip()
     if payload.unit is not None:
-        item.unit = normalize_unit(payload.unit) or payload.unit.strip()
-
+        norm_unit, _ = normalize_unit(payload.unit)
+        item.unit = norm_unit
     if payload.rate is not None:
         item.rate = payload.rate
-
     if payload.category_name is not None:
         item.category_name = payload.category_name.strip()
-
-    if payload.sector is not None:
-        item.sector = payload.sector.strip()
-
-    if payload.rate_system is not None:
-        item.rate_system = payload.rate_system.strip()
-
     if payload.validation_status is not None:
         item.validation_status = payload.validation_status.upper()
         if item.validation_status == "APPROVED":
             item.verified_at = datetime.utcnow()
-
     if payload.validation_notes is not None:
         item.validation_notes = payload.validation_notes
+
+    if current_user:
+        item.updated_by_email = current_user.email
 
     item.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(item)
+
+    log_audit(
+        db=db,
+        action="UPDATE_RATE_ITEM",
+        entity_type="RATE_ITEM",
+        entity_id=str(rate_id),
+        description=f"Updated item {item.item_code}: status={item.validation_status}, rate={item.rate}",
+        user=current_user,
+    )
 
     out = RateItemOut.model_validate(item)
     out.original_filename = item.source_file.original_filename if item.source_file else None
     return out
 
 @router.post("/{rate_id}/approve", response_model=RateItemOut)
-def approve_review_item(rate_id: int, db: Session = Depends(get_db)):
+def approve_review_item(
+    rate_id: int,
+    current_user: User | None = Depends(get_current_user_optional),
+    db: Session = Depends(get_db),
+):
+    if current_user and current_user.role == "VIEWER":
+        raise HTTPException(status_code=403, detail="Viewers have read-only permissions.")
+
     item = db.get(RateItem, rate_id)
     if not item:
         raise HTTPException(status_code=404, detail="Rate item not found")
@@ -112,47 +124,97 @@ def approve_review_item(rate_id: int, db: Session = Depends(get_db)):
     item.validation_status = "APPROVED"
     item.verified_at = datetime.utcnow()
     item.updated_at = datetime.utcnow()
+    if current_user:
+        item.updated_by_email = current_user.email
+
     db.commit()
     db.refresh(item)
+
+    log_audit(
+        db=db,
+        action="APPROVE_RATE_ITEM",
+        entity_type="RATE_ITEM",
+        entity_id=str(rate_id),
+        description=f"Approved item {item.item_code}",
+        user=current_user,
+    )
 
     out = RateItemOut.model_validate(item)
     out.original_filename = item.source_file.original_filename if item.source_file else None
     return out
 
 @router.post("/{rate_id}/reject", response_model=RateItemOut)
-def reject_review_item(rate_id: int, db: Session = Depends(get_db)):
+def reject_review_item(
+    rate_id: int,
+    current_user: User | None = Depends(get_current_user_optional),
+    db: Session = Depends(get_db),
+):
+    if current_user and current_user.role == "VIEWER":
+        raise HTTPException(status_code=403, detail="Viewers have read-only permissions.")
+
     item = db.get(RateItem, rate_id)
     if not item:
         raise HTTPException(status_code=404, detail="Rate item not found")
 
     item.validation_status = "REJECTED"
     item.updated_at = datetime.utcnow()
+    if current_user:
+        item.updated_by_email = current_user.email
+
     db.commit()
     db.refresh(item)
+
+    log_audit(
+        db=db,
+        action="REJECT_RATE_ITEM",
+        entity_type="RATE_ITEM",
+        entity_id=str(rate_id),
+        description=f"Rejected item {item.item_code}",
+        user=current_user,
+    )
 
     out = RateItemOut.model_validate(item)
     out.original_filename = item.source_file.original_filename if item.source_file else None
     return out
 
 @router.post("/bulk-action", response_model=dict)
-def bulk_review_action(payload: ReviewBulkActionRequest, db: Session = Depends(get_db)):
+def bulk_review_action(
+    payload: ReviewBulkActionRequest,
+    current_user: User | None = Depends(get_current_user_optional),
+    db: Session = Depends(get_db),
+):
+    if current_user and current_user.role == "VIEWER":
+        raise HTTPException(status_code=403, detail="Viewers have read-only permissions.")
+
     if not payload.item_ids:
         return {"updated": 0, "message": "No item IDs provided"}
 
     target_status = "APPROVED" if payload.action.upper() == "APPROVE" else "REJECTED"
     now = datetime.utcnow()
 
+    values_dict = {
+        "validation_status": target_status,
+        "verified_at": now if target_status == "APPROVED" else None,
+        "updated_at": now,
+    }
+    if current_user:
+        values_dict["updated_by_email"] = current_user.email
+
     stmt = (
         update(RateItem)
         .where(RateItem.id.in_(payload.item_ids))
-        .values(
-            validation_status=target_status,
-            verified_at=now if target_status == "APPROVED" else None,
-            updated_at=now,
-        )
+        .values(**values_dict)
     )
     result = db.execute(stmt)
     db.commit()
+
+    log_audit(
+        db=db,
+        action=f"BULK_{target_status}",
+        entity_type="RATE_ITEM",
+        description=f"Bulk {target_status} applied to {result.rowcount} items",
+        user=current_user,
+    )
 
     return {
         "updated": result.rowcount,
@@ -161,20 +223,40 @@ def bulk_review_action(payload: ReviewBulkActionRequest, db: Session = Depends(g
     }
 
 @router.post("/document/{doc_id}/approve-valid", response_model=dict)
-def approve_valid_document_items(doc_id: int, db: Session = Depends(get_db)):
+def approve_valid_document_items(
+    doc_id: int,
+    current_user: User | None = Depends(get_current_user_optional),
+    db: Session = Depends(get_db),
+):
     """Approves all VALID items for a given uploaded document in one click."""
+    if current_user and current_user.role == "VIEWER":
+        raise HTTPException(status_code=403, detail="Viewers have read-only permissions.")
+
     doc = db.get(SourceFile, doc_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
     now = datetime.utcnow()
+    values_dict = {"validation_status": "APPROVED", "verified_at": now, "updated_at": now}
+    if current_user:
+        values_dict["updated_by_email"] = current_user.email
+
     stmt = (
         update(RateItem)
         .where(RateItem.source_file_id == doc_id, RateItem.validation_status == "VALID")
-        .values(validation_status="APPROVED", verified_at=now, updated_at=now)
+        .values(**values_dict)
     )
     result = db.execute(stmt)
     db.commit()
+
+    log_audit(
+        db=db,
+        action="APPROVE_DOCUMENT_VALID",
+        entity_type="SOURCE_FILE",
+        entity_id=str(doc_id),
+        description=f"Approved {result.rowcount} valid items for document {doc.original_filename}",
+        user=current_user,
+    )
 
     return {
         "document_id": doc_id,

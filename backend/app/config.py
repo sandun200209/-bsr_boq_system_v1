@@ -14,13 +14,25 @@ class Settings(BaseSettings):
         "postgresql+psycopg://bsr_user:bsr_password@db:5432/bsr_boq"
     )
     
-    # Upload & Storage
+    # Cloud / Local Storage
+    STORAGE_BACKEND: str = os.getenv("STORAGE_BACKEND", "auto")  # auto, supabase, local
+    SUPABASE_URL: str | None = os.getenv("SUPABASE_URL", None)
+    SUPABASE_ANON_KEY: str | None = os.getenv("SUPABASE_ANON_KEY", None)
+    SUPABASE_SERVICE_ROLE_KEY: str | None = os.getenv("SUPABASE_SERVICE_ROLE_KEY", None)
+    SUPABASE_STORAGE_BUCKET: str = os.getenv("SUPABASE_STORAGE_BUCKET", "bsr-documents")
+
     UPLOAD_DIR: Path = Path(os.getenv("UPLOAD_DIR", "/data/uploads"))
     MAX_UPLOAD_SIZE_BYTES: int = 250 * 1024 * 1024  # 250 MB
     
-    # Allowed file extensions
+    # Authentication & Security
+    JWT_SECRET: str = os.getenv("JWT_SECRET", "bsr-rate-hub-secure-jwt-secret-key-2026-production")
+    JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "10080"))  # 7 days
+
+    # Allowed file extensions (including docs and images)
     ALLOWED_EXTENSIONS: set[str] = {
-        ".pdf", ".xlsx", ".xlsm", ".docx", ".csv", ".tsv", ".txt"
+        ".pdf", ".xlsx", ".xlsm", ".xls", ".docx", ".doc", ".csv", ".tsv", ".txt",
+        ".jpg", ".jpeg", ".png", ".zip"
     }
 
     # Sri Lanka Provinces & Districts

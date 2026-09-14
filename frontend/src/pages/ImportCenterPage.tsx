@@ -8,8 +8,10 @@ import {
   ArrowRight,
   ShieldCheck,
   RefreshCw,
+  Lock,
 } from 'lucide-react';
 import { api } from '../api/client';
+import { useAuth } from '../context/AuthContext';
 import {
   PROVINCE_LIST,
   SRI_LANKA_PROVINCES,
@@ -32,6 +34,9 @@ export const ImportCenterPage: React.FC<ImportCenterPageProps> = ({
   onNavigate,
   onRefreshMetrics,
 }) => {
+  const { user } = useAuth();
+  const isViewer = user?.role === 'VIEWER';
+
   // Form State
   const [sector, setSector] = useState<string>('Building Works');
   const [rateSystem, setRateSystem] = useState<string>('BSR');
@@ -76,9 +81,9 @@ export const ImportCenterPage: React.FC<ImportCenterPageProps> = ({
 
   const handleFileSelected = (file: File) => {
     const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
-    const allowed = ['.pdf', '.xlsx', '.xlsm', '.docx', '.csv', '.tsv', '.txt'];
+    const allowed = ['.pdf', '.xlsx', '.xlsm', '.docx', '.doc', '.xls', '.csv', '.tsv', '.txt', '.jpg', '.jpeg', '.png', '.zip'];
     if (!allowed.includes(ext)) {
-      setError(`Unsupported format "${ext}". Supported formats: PDF (.pdf), Excel (.xlsx, .xlsm), Word (.docx), CSV (.csv), TSV (.tsv), TXT (.txt)`);
+      setError(`Unsupported format "${ext}". Supported formats: PDF (.pdf), Excel (.xlsx, .xlsm, .xls), Word (.docx, .doc), Images (.jpg, .jpeg, .png), CSV (.csv), TSV (.tsv), ZIP (.zip), TXT (.txt)`);
       return;
     }
     if (file.size > 250 * 1024 * 1024) {
@@ -144,24 +149,33 @@ export const ImportCenterPage: React.FC<ImportCenterPageProps> = ({
   };
 
   return (
-    <div className="p-8 max-w-5xl mx-auto space-y-8">
+    <div className="p-4 sm:p-8 max-w-5xl mx-auto space-y-6 sm:space-y-8">
       <div>
-        <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Import Center</h2>
-        <p className="text-sm text-slate-500 mt-1">
-          Upload official BSR documents (PDF, Excel .xlsx/.xlsm, Word .docx, CSV, TSV, TXT) up to 250 MB. The system automatically
-          extracts rate items, stores the original file permanently, and routes questionable rows to the Review Queue.
+        <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Import Center</h2>
+        <p className="text-xs sm:text-sm text-slate-500 mt-1">
+          Upload official BSR documents (PDF, Excel, Word, CSV, Images) up to 250 MB. The system automatically
+          extracts rate items, stores the original file permanently in centralized storage, and routes questionable rows to the Review Queue.
         </p>
       </div>
 
+      {isViewer && (
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs sm:text-sm flex items-center gap-3">
+          <Lock className="w-5 h-5 text-amber-600 shrink-0" />
+          <span>
+            <strong>Read-Only Account (VIEWER):</strong> You have read-only access to view and compare rates. Uploading and ingesting new documents requires a USER, MANAGER, or ADMIN account.
+          </span>
+        </div>
+      )}
+
       {error && (
         <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-sm flex items-center gap-3">
-          <AlertTriangle className="w-5 h-5 text-rose-600 flex-shrink-0" />
+          <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
       {/* Upload and Metadata Card */}
-      <form onSubmit={handleUploadAndAnalyze} className="bg-white border border-slate-200 rounded-2xl shadow-xs p-6 space-y-6">
+      <form onSubmit={handleUploadAndAnalyze} className="bg-white border border-slate-200 rounded-2xl shadow-xs p-4 sm:p-6 space-y-6">
         <h3 className="text-base font-bold text-slate-900 border-b border-slate-100 pb-3">
           Document Metadata Specification
         </h3>
@@ -356,7 +370,7 @@ export const ImportCenterPage: React.FC<ImportCenterPageProps> = ({
             ref={fileInputRef}
             type="file"
             className="hidden"
-            accept=".pdf,.xlsx,.xlsm,.docx,.csv,.tsv,.txt"
+            accept=".pdf,.xlsx,.xlsm,.docx,.doc,.xls,.csv,.tsv,.txt,.jpg,.jpeg,.png,.zip,image/*,application/pdf"
             onChange={(e) => {
               if (e.target.files && e.target.files[0]) {
                 handleFileSelected(e.target.files[0]);
@@ -384,7 +398,7 @@ export const ImportCenterPage: React.FC<ImportCenterPageProps> = ({
                   Click to select BSR document or drag and drop file here
                 </span>
                 <span className="text-xs text-slate-400 block mt-1">
-                  Supported formats: PDF (.pdf), Excel (.xlsx, .xlsm), Word (.docx), CSV (.csv), TSV (.tsv), TXT (.txt) (Up to 250 MB)
+                  Supported formats: PDF (.pdf), Excel (.xlsx, .xlsm, .xls), Word (.docx, .doc), Images (.jpg, .png), CSV, ZIP (Up to 250 MB)
                 </span>
               </div>
             )}
@@ -392,7 +406,7 @@ export const ImportCenterPage: React.FC<ImportCenterPageProps> = ({
         </div>
 
         {/* Upload Button & Progress */}
-        <div className="flex items-center justify-between pt-2">
+        <div className="flex items-center justify-between pt-2 flex-wrap gap-4">
           <div className="text-xs text-slate-500">
             <span>Destination: </span>
             <span className="font-mono text-slate-700 font-medium">
@@ -402,9 +416,9 @@ export const ImportCenterPage: React.FC<ImportCenterPageProps> = ({
 
           <button
             type="submit"
-            disabled={!selectedFile || isUploading}
+            disabled={!selectedFile || isUploading || isViewer}
             className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-semibold text-sm transition-all ${
-              !selectedFile || isUploading
+              !selectedFile || isUploading || isViewer
                 ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
                 : 'bg-blue-600 hover:bg-blue-500 text-white shadow-sm'
             }`}

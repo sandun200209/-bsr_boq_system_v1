@@ -5,7 +5,7 @@ from sqlalchemy import select, func, desc, or_
 from sqlalchemy.orm import Session, joinedload
 
 from ..database import get_db
-from ..models import MasterItem, RateItemMasterMapping, RateItem
+from ..models import MasterItem, RateItemMasterMapping, RateItem, User
 from ..schemas import (
     MasterItemOut,
     MasterItemCreate,
@@ -14,6 +14,7 @@ from ..schemas import (
     MasterSuggestionOut,
     RateItemOut,
 )
+from ..services.auth_service import get_current_user_optional, require_role, log_audit
 
 router = APIRouter(prefix="/master-items", tags=["Master Items"])
 
@@ -54,7 +55,14 @@ def list_master_items(
     return result
 
 @router.post("", response_model=MasterItemOut)
-def create_master_item(payload: MasterItemCreate, db: Session = Depends(get_db)):
+def create_master_item(
+    payload: MasterItemCreate,
+    current_user: User | None = Depends(get_current_user_optional),
+    db: Session = Depends(get_db),
+):
+    if current_user and current_user.role == "VIEWER":
+        raise HTTPException(status_code=403, detail="Viewers have read-only permissions.")
+
     existing = db.scalar(select(MasterItem).where(MasterItem.master_code == payload.master_code.strip()))
     if existing:
         raise HTTPException(status_code=400, detail=f"Master item code '{payload.master_code}' already exists.")
@@ -67,11 +75,27 @@ def create_master_item(payload: MasterItemCreate, db: Session = Depends(get_db))
         sector=payload.sector.strip() if payload.sector else "Building Works",
         rate_system=payload.rate_system.strip() if payload.rate_system else "BSR",
         notes=payload.notes.strip() if payload.notes else None,
+        updated_by_email=current_user.email if current_user else None,
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow(),
     )
     db.add(item)
     db.commit()
     db.refresh(item)
-    return MasterItemOut.model_validate(item)
+
+    log_audit(
+        db=db,
+        action="CREATE_MASTER_ITEM",
+        entity_type="MASTER_ITEM",
+        entity_id=str(item.id),
+        description=f"Created canonical item {item.master_code}",
+        user=current_user,
+    )
+
+    out = MasterItemOut.model_validate(item)
+    out.mapped_count = 0
+    out.mapped_rates = []
+    return out
 
 @router.get("/{item_id}", response_model=MasterItemOut)
 def get_master_item(item_id: int, db: Session = Depends(get_db)):
@@ -91,7 +115,15 @@ def get_master_item(item_id: int, db: Session = Depends(get_db)):
     return out
 
 @router.put("/{item_id}", response_model=MasterItemOut)
-def update_master_item(item_id: int, payload: MasterItemUpdate, db: Session = Depends(get_db)):
+def update_master_item(
+    item_id: int,
+    payload: MasterItemUpdate,
+    current_user: User | None = Depends(get_current_user_optional),
+    db: Session = Depends(get_db),
+):
+    if current_user and current_user.role == "VIEWER":
+        raise HTTPException(status_code=403, detail="Viewers have read-only permissions.")
+
     item = db.get(MasterItem, item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Master item not found")
@@ -111,30 +143,66 @@ def update_master_item(item_id: int, payload: MasterItemUpdate, db: Session = De
     if payload.notes is not None:
         item.notes = payload.notes.strip() or None
 
+    if current_user:
+        item.updated_by_email = current_user.email
+
     item.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(item)
+
+    log_audit(
+        db=db,
+        action="UPDATE_MASTER_ITEM",
+        entity_type="MASTER_ITEM",
+        entity_id=str(item.id),
+        description=f"Updated canonical item {item.master_code}",
+        user=current_user,
+    )
+
     return MasterItemOut.model_validate(item)
 
 @router.delete("/{item_id}")
-def delete_master_item(item_id: int, db: Session = Depends(get_db)):
+def delete_master_item(
+    item_id: int,
+    current_user: User | None = Depends(get_current_user_optional),
+    db: Session = Depends(get_db),
+):
+    if current_user and current_user.role == "VIEWER":
+        raise HTTPException(status_code=403, detail="Viewers have read-only permissions.")
+
     item = db.get(MasterItem, item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Master item not found")
 
+    code = item.master_code
     # Unlink mapped rate items
-    db.execute(
-        select(RateItem).where(RateItem.master_item_id == item_id)
-    )
     for rate_item in db.scalars(select(RateItem).where(RateItem.master_item_id == item_id)).all():
         rate_item.master_item_id = None
 
     db.delete(item)
     db.commit()
-    return {"success": True, "message": "Master item deleted successfully"}
+
+    log_audit(
+        db=db,
+        action="DELETE_MASTER_ITEM",
+        entity_type="MASTER_ITEM",
+        entity_id=str(item_id),
+        description=f"Deleted canonical item {code}",
+        user=current_user,
+    )
+
+    return {"success": True, "message": f"Master item '{code}' deleted successfully"}
 
 @router.post("/{item_id}/map", response_model=dict)
-def map_rate_to_master(item_id: int, payload: MasterMappingRequest, db: Session = Depends(get_db)):
+def map_rate_to_master(
+    item_id: int,
+    payload: MasterMappingRequest,
+    current_user: User | None = Depends(get_current_user_optional),
+    db: Session = Depends(get_db),
+):
+    if current_user and current_user.role == "VIEWER":
+        raise HTTPException(status_code=403, detail="Viewers have read-only permissions.")
+
     master = db.get(MasterItem, item_id)
     if not master:
         raise HTTPException(status_code=404, detail="Master item not found")
@@ -154,12 +222,21 @@ def map_rate_to_master(item_id: int, payload: MasterMappingRequest, db: Session 
         master_item_id=master.id,
         rate_item_id=rate_item.id,
         confidence=1.0,
-        mapped_by="user",
+        mapped_by=current_user.email if current_user else "user",
         mapped_at=datetime.utcnow(),
     )
     rate_item.master_item_id = master.id
     db.add(mapping)
     db.commit()
+
+    log_audit(
+        db=db,
+        action="MAP_RATE_TO_MASTER",
+        entity_type="MASTER_ITEM",
+        entity_id=str(master.id),
+        description=f"Mapped '{rate_item.item_code}' to Master '{master.master_code}'",
+        user=current_user,
+    )
 
     return {
         "success": True,
@@ -169,7 +246,14 @@ def map_rate_to_master(item_id: int, payload: MasterMappingRequest, db: Session 
     }
 
 @router.post("/unmap/{rate_item_id}", response_model=dict)
-def unmap_rate_from_master(rate_item_id: int, db: Session = Depends(get_db)):
+def unmap_rate_from_master(
+    rate_item_id: int,
+    current_user: User | None = Depends(get_current_user_optional),
+    db: Session = Depends(get_db),
+):
+    if current_user and current_user.role == "VIEWER":
+        raise HTTPException(status_code=403, detail="Viewers have read-only permissions.")
+
     rate_item = db.get(RateItem, rate_item_id)
     if not rate_item:
         raise HTTPException(status_code=404, detail="Rate item not found")
@@ -182,6 +266,15 @@ def unmap_rate_from_master(rate_item_id: int, db: Session = Depends(get_db)):
 
     rate_item.master_item_id = None
     db.commit()
+
+    log_audit(
+        db=db,
+        action="UNMAP_RATE_FROM_MASTER",
+        entity_type="RATE_ITEM",
+        entity_id=str(rate_item_id),
+        description=f"Unmapped rate item {rate_item.item_code}",
+        user=current_user,
+    )
 
     return {"success": True, "message": f"Unmapped rate item {rate_item_id}."}
 

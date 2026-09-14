@@ -5,10 +5,12 @@ import {
   X,
   Edit2,
   RefreshCw,
+  Lock,
 } from 'lucide-react';
 import { api } from '../api/client';
 import { RateItem } from '../types';
 import { SECTORS, SECTOR_BADGE_CLASSES } from '../constants/sriLanka';
+import { useAuth } from '../context/AuthContext';
 
 interface ReviewQueuePageProps {
   initialFileId?: number;
@@ -19,6 +21,9 @@ export const ReviewQueuePage: React.FC<ReviewQueuePageProps> = ({
   initialFileId,
   onRefreshMetrics,
 }) => {
+  const { user, hasRole } = useAuth();
+  const canReview = hasRole(['ADMIN', 'MANAGER']);
+
   const [items, setItems] = useState<RateItem[]>([]);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
@@ -136,10 +141,19 @@ export const ReviewQueuePage: React.FC<ReviewQueuePageProps> = ({
 
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-6">
+      {!canReview && (
+        <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs sm:text-sm flex items-center gap-3">
+          <Lock className="w-5 h-5 text-amber-600 shrink-0" />
+          <span>
+            <strong>Read-Only Inspection Mode:</strong> You are signed in with the {user?.role || 'VIEWER'} role. Approving, rejecting, or editing queue items requires MANAGER or ADMIN privileges.
+          </span>
+        </div>
+      )}
+
       {/* Header & Bulk Actions */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Review Queue</h2>
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Review Queue</h2>
           <p className="text-xs text-slate-500 mt-1">
             Questionable rows identified during extraction. Review, correct, or reject items before final storage.
           </p>
@@ -170,10 +184,10 @@ export const ReviewQueuePage: React.FC<ReviewQueuePageProps> = ({
           </select>
 
           <button
-            disabled={selectedIds.length === 0}
+            disabled={selectedIds.length === 0 || !canReview}
             onClick={() => handleBulkAction('APPROVE')}
             className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
-              selectedIds.length === 0
+              selectedIds.length === 0 || !canReview
                 ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
                 : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs'
             }`}
@@ -183,10 +197,10 @@ export const ReviewQueuePage: React.FC<ReviewQueuePageProps> = ({
           </button>
 
           <button
-            disabled={selectedIds.length === 0}
+            disabled={selectedIds.length === 0 || !canReview}
             onClick={() => handleBulkAction('REJECT')}
             className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
-              selectedIds.length === 0
+              selectedIds.length === 0 || !canReview
                 ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
                 : 'bg-rose-600 hover:bg-rose-500 text-white shadow-xs'
             }`}
@@ -348,25 +362,40 @@ export const ReviewQueuePage: React.FC<ReviewQueuePageProps> = ({
                       <td className="py-3 px-4 text-center">
                         <div className="flex items-center justify-center gap-1.5">
                           <button
+                            disabled={!canReview}
                             onClick={() => startEditing(item)}
-                            title="Edit row details"
-                            className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded-lg transition-colors"
+                            title={canReview ? "Edit row details" : "Editing requires Manager or Admin"}
+                            className={`p-1.5 rounded-lg transition-colors ${
+                              !canReview
+                                ? 'text-slate-300 cursor-not-allowed'
+                                : 'text-slate-500 hover:text-blue-600 hover:bg-slate-100'
+                            }`}
                           >
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
 
                           <button
+                            disabled={!canReview}
                             onClick={() => handleApproveSingle(item.id)}
-                            title="Approve row"
-                            className="p-1.5 text-emerald-600 hover:text-white hover:bg-emerald-600 rounded-lg transition-all border border-emerald-200 hover:border-emerald-600"
+                            title={canReview ? "Approve row" : "Approval requires Manager or Admin"}
+                            className={`p-1.5 rounded-lg transition-all border ${
+                              !canReview
+                                ? 'text-slate-300 border-slate-200 cursor-not-allowed'
+                                : 'text-emerald-600 hover:text-white hover:bg-emerald-600 border-emerald-200 hover:border-emerald-600'
+                            }`}
                           >
                             <Check className="w-3.5 h-3.5" />
                           </button>
 
                           <button
+                            disabled={!canReview}
                             onClick={() => handleRejectSingle(item.id)}
-                            title="Reject row"
-                            className="p-1.5 text-rose-600 hover:text-white hover:bg-rose-600 rounded-lg transition-all border border-rose-200 hover:border-rose-600"
+                            title={canReview ? "Reject row" : "Rejection requires Manager or Admin"}
+                            className={`p-1.5 rounded-lg transition-all border ${
+                              !canReview
+                                ? 'text-slate-300 border-slate-200 cursor-not-allowed'
+                                : 'text-rose-600 hover:text-white hover:bg-rose-600 border-rose-200 hover:border-rose-600'
+                            }`}
                           >
                             <X className="w-3.5 h-3.5" />
                           </button>

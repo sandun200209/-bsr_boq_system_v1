@@ -1,3 +1,32 @@
+export interface User {
+  id: number;
+  email: string;
+  username: string;
+  full_name: string;
+  role: 'ADMIN' | 'MANAGER' | 'USER' | 'VIEWER';
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AuthResponse {
+  access_token: string;
+  token_type: string;
+  user: User;
+}
+
+export interface AuditLog {
+  id: number;
+  user_id?: number | null;
+  user_email?: string | null;
+  action: string;
+  entity_type: string;
+  entity_id?: string | null;
+  description?: string | null;
+  ip_address?: string | null;
+  created_at: string;
+}
+
 export interface SourceFile {
   id: number;
   original_filename: string;
@@ -15,6 +44,10 @@ export interface SourceFile {
   category_hint?: string | null;
   sector: string;
   rate_system: string;
+  storage_provider?: string;
+  storage_key?: string | null;
+  public_url?: string | null;
+  uploaded_by_email?: string | null;
   upload_status: string;
   import_status: string;
   uploaded_at: string;
@@ -55,11 +88,12 @@ export interface RateItem {
   updated_at: string;
   verified_at?: string | null;
   original_filename?: string | null;
+  updated_by_email?: string | null;
 }
 
 export interface FilterOptions {
-  sectors?: string[];
-  rate_systems?: string[];
+  sectors: string[];
+  rate_systems: string[];
   provinces: string[];
   districts: string[];
   years: number[];
@@ -67,7 +101,7 @@ export interface FilterOptions {
   dataset_types: string[];
   vat_bases: string[];
   categories: string[];
-  sheets?: string[];
+  sheets: string[];
   sector_systems?: Record<string, string[]>;
   category_presets?: Record<string, string[]>;
 }
@@ -86,10 +120,10 @@ export interface CompareRow {
   description?: string | null;
   unit?: string | null;
   rate: number;
-  is_base: boolean;
+  is_base?: boolean;
   diff_lkr: number;
   diff_percent: number;
-  source_label: string;
+  source_label?: string;
 }
 
 export interface CompareGroup {
@@ -110,6 +144,14 @@ export interface CompareResponse {
   total_items_compared: number;
 }
 
+export interface RateItemSearchResponse {
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+  items: RateItem[];
+}
+
 export interface MasterItem {
   id: number;
   master_code: string;
@@ -123,6 +165,7 @@ export interface MasterItem {
   updated_at: string;
   mapped_count: number;
   mapped_rates?: RateItem[];
+  updated_by_email?: string | null;
 }
 
 export interface MasterSuggestion {

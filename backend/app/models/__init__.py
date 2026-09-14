@@ -6,6 +6,34 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from ..database import Base
 
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
+    username: Mapped[str] = mapped_column(String(100), unique=True, index=True, nullable=False)
+    hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
+    full_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    role: Mapped[str] = mapped_column(String(50), default="USER", server_default="USER", index=True)  # ADMIN, MANAGER, USER, VIEWER
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    user_email: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    action: Mapped[str] = mapped_column(String(80), nullable=False, index=True)  # LOGIN, LOGOUT, CREATE, UPDATE, DELETE, UPLOAD, APPROVE, REJECT
+    entity_type: Mapped[str] = mapped_column(String(80), nullable=False, index=True)  # RATE_ITEM, SOURCE_FILE, MASTER_ITEM, USER, SYSTEM
+    entity_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ip_address: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
 class SourceFile(Base):
     __tablename__ = "source_files"
 
@@ -26,6 +54,13 @@ class SourceFile(Base):
     category_hint: Mapped[str | None] = mapped_column(String(120), nullable=True)
     sector: Mapped[str] = mapped_column(String(100), default="Building Works", server_default="Building Works", index=True)
     rate_system: Mapped[str] = mapped_column(String(100), default="BSR", server_default="BSR", index=True)
+
+    # Cloud Storage & Upload Metadata
+    storage_provider: Mapped[str] = mapped_column(String(50), default="local", server_default="local")  # local, supabase
+    storage_key: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    public_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    uploaded_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    uploaded_by_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     upload_status: Mapped[str] = mapped_column(String(40), default="UPLOADED", index=True)
     import_status: Mapped[str] = mapped_column(String(40), default="READY_FOR_REVIEW", index=True)
@@ -76,6 +111,7 @@ class MasterItem(Base):
     sector: Mapped[str] = mapped_column(String(100), default="Building Works", server_default="Building Works", index=True)
     rate_system: Mapped[str | None] = mapped_column(String(100), default="BSR", server_default="BSR", nullable=True, index=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    updated_by_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
@@ -125,6 +161,7 @@ class RateItem(Base):
         String(40), default="VALID", index=True
     )  # VALID, NEEDS_REVIEW, REJECTED, APPROVED
     validation_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    updated_by_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(

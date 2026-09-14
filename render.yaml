@@ -1,0 +1,26 @@
+services:
+  # Backend Web API
+  - type: web
+    name: bsr-rate-hub-api
+    runtime: docker
+    dockerfilePath: backend/Dockerfile
+    dockerContext: backend
+    plan: standard
+    region: singapore
+    envVars:
+      - key: PORT
+        value: 8000
+      - key: DATABASE_URL
+        sync: false # Set to your Supabase postgresql://postgres:password@db.xxx.supabase.co:5432/postgres
+      - key: STORAGE_BACKEND
+        value: supabase
+      - key: SUPABASE_URL
+        sync: false # e.g. https://xyzcompany.supabase.co
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false # Supabase service_role key
+      - key: SUPABASE_STORAGE_BUCKET
+        value: bsr-documents
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ORIGINS
+        value: "*"

@@ -32,6 +32,10 @@ class SourceFileOut(SourceFileBase):
     valid_rows: int
     review_rows: int
     rejected_rows: int
+    storage_provider: str = "local"
+    storage_key: str | None = None
+    public_url: str | None = None
+    uploaded_by_email: str | None = None
 
 class ImportJobOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -77,6 +81,7 @@ class RateItemOut(BaseModel):
     original_filename: str | None = None
     sector: str = "Building Works"
     rate_system: str = "BSR"
+    updated_by_email: str | None = None
 
 class RateItemUpdate(BaseModel):
     item_code: str | None = None
@@ -182,6 +187,7 @@ class MasterItemOut(MasterItemBase):
     updated_at: datetime
     mapped_count: int = 0
     mapped_rates: list[RateItemOut] = []
+    updated_by_email: str | None = None
 
 class MasterMappingRequest(BaseModel):
     rate_item_id: int
@@ -192,3 +198,56 @@ class MasterSuggestionOut(BaseModel):
     master_code: str
     canonical_description: str
     similarity: float
+
+# ----------------- Authentication & Users -----------------
+class UserLogin(BaseModel):
+    username_or_email: str
+    password: str
+
+class UserOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    email: str
+    username: str
+    full_name: str
+    role: str  # ADMIN, MANAGER, USER, VIEWER
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserOut
+
+class UserCreate(BaseModel):
+    email: str
+    username: str
+    password: str
+    full_name: str
+    role: str = "USER"
+
+class UserUpdate(BaseModel):
+    full_name: str | None = None
+    role: str | None = None
+    is_active: bool | None = None
+    password: str | None = None
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+# ----------------- Audit Logs -----------------
+class AuditLogOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    user_id: int | None
+    user_email: str | None
+    action: str
+    entity_type: str
+    entity_id: str | None
+    description: str | None
+    ip_address: str | None
+    created_at: datetime

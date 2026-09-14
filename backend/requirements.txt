@@ -12,3 +12,6 @@ pymupdf>=1.24.11
 pdfplumber>=0.11.4
 pandas>=2.2.3
 pytest>=8.3.3
+pyjwt>=2.8.0
+bcrypt>=4.0.1
+requests>=2.32.0
