@@ -1,0 +1,78 @@
+================================================================================
+          BSR RATE HUB - SRI LANKA BOQ & MULTI-SECTOR RATE SYSTEM
+                     COMPLETE INSTALLATION PACKAGE
+================================================================================
+
+Supports:
+  1. BSR - Building Schedule of Rates (Provincial Councils)
+  2. HSR - Highway Schedule of Rates (Road Development Authority - RDA)
+  3. Water Supply Rates (National Water Supply & Drainage Board - NWSDB)
+  4. Sewerage & Storm Water Drainage Works (Municipal Councils / SLLRDC)
+
+================================================================================
+  HOW TO INSTALL ON THIS PC / LAPTOP IN 3 EASY STEPS
+================================================================================
+
+STEP 1: PREREQUISITE (DOCKER DESKTOP)
+-------------------------------------
+Make sure Docker Desktop is installed and running on your Windows PC or laptop.
+  - If you already have Docker Desktop: Just ensure it is started (green icon).
+  - If you DO NOT have Docker Desktop:
+    Download it free from: https://www.docker.com/products/docker-desktop/
+    (Or our installer will offer to download it for you automatically).
+
+
+STEP 2: RUN THE INSTALLER
+-------------------------
+Choose ONE of the two options below:
+
+  OPTION A: FAST OFFLINE INSTALL (Zero Internet Required - Takes 15 Seconds)
+  -------------------------------------------------------------------------
+  Double-click:
+     install_offline.bat
+
+  This imports the included pre-packaged Docker engines (offline_bundle\docker_images.tar),
+  restores all 3,754 rate items, creates your Windows Desktop shortcut,
+  and opens the web application immediately!
+
+  OR
+
+  OPTION B: ONLINE WIZARD INSTALLER
+  ---------------------------------
+  Double-click:
+     INSTALL_ON_NEW_PC.bat
+
+  This wizard checks your system, starts Docker, deploys the engines,
+  creates the desktop shortcut, configures firewall, and opens the app.
+
+
+STEP 3: START USING THE SYSTEM!
+-------------------------------
+Once installed:
+  - Local PC Access:  http://localhost:8080
+  - Daily Launch:     Double-click the "BSR Rate Hub" icon on your Windows Desktop!
+  - Stop the System:  Double-click "stop_windows.bat"
+
+
+================================================================================
+  HOW TO SHARE WITH OTHER PCS / LAPTOPS IN YOUR OFFICE (OFFICE LAN)
+================================================================================
+You DO NOT need to install anything on your colleagues' laptops!
+One PC acts as the server, and everyone in the office can connect via Wi-Fi:
+
+1. On the host PC (where BSR Rate Hub is installed), double-click:
+      allow_firewall_lan.bat
+
+2. It will display your PC's network address, for example:
+      http://192.168.1.15:8080
+
+3. Any coworker on the same office Wi-Fi can open Chrome or Edge and type
+   that address to search rates, compare provincial costs, and create BOQs!
+
+
+================================================================================
+  NEED MORE DETAILS?
+================================================================================
+Open 'SETUP_GUIDE.md' or 'README.md' for complete documentation, hardware
+requirements, backup/restore instructions, and troubleshooting tips.
+================================================================================
