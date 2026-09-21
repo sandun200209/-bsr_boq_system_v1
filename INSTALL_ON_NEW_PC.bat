@@ -26,34 +26,43 @@ if %ERRORLEVEL% EQU 0 (
 )
 
 :: Docker is not running. Is it installed?
+set "DOCKER_EXE="
 if exist "C:\Program Files\Docker\Docker\Docker Desktop.exe" (
-    echo [INFO] Docker Desktop is installed but not started.
-    echo Launching Docker Desktop in the background...
-    start "" "C:\Program Files\Docker\Docker\Docker Desktop.exe"
-    
-    echo Waiting for Docker Desktop engine to initialize (up to 90 seconds)...
-    set WAITED=0
-    :WAIT_DOCKER_LOOP
-    timeout /t 3 /nobreak >nul
-    docker info >nul 2>&1
-    if %ERRORLEVEL% EQU 0 (
-        echo [SUCCESS] Docker Desktop is now running!
-        goto DOCKER_OK
-    )
-    set /a WAITED+=3
-    echo   Initializing engine... (!WAITED!s)
-    if !WAITED! GEQ 90 (
-        echo.
-        echo [ERROR] Docker Desktop engine took longer than 90 seconds to respond.
-        echo Please look at your Windows system tray (near the clock) for Docker Desktop.
-        echo Wait until the whale icon shows 'Engine running', then run this setup again.
-        echo.
-        pause
-        exit /b 1
-    )
-    goto WAIT_DOCKER_LOOP
+    set "DOCKER_EXE=C:\Program Files\Docker\Docker\Docker Desktop.exe"
+) else if exist "%LOCALAPPDATA%\Programs\Docker\Docker\Docker Desktop.exe" (
+    set "DOCKER_EXE=%LOCALAPPDATA%\Programs\Docker\Docker\Docker Desktop.exe"
 )
 
+if "%DOCKER_EXE%"=="" goto DOCKER_NOT_INSTALLED
+
+echo [INFO] Docker Desktop is installed but not started.
+echo Launching Docker Desktop in the background...
+start "" "%DOCKER_EXE%"
+
+echo Waiting for Docker Desktop engine to initialize (up to 90 seconds)...
+set WAITED=0
+
+:WAIT_DOCKER_LOOP
+ping 127.0.0.1 -n 4 >nul
+docker info >nul 2>&1
+if %ERRORLEVEL% EQU 0 (
+    echo [SUCCESS] Docker Desktop is now running!
+    goto DOCKER_OK
+)
+set /a WAITED+=3
+echo   Initializing engine... (!WAITED!s)
+if !WAITED! GEQ 90 (
+    echo.
+    echo [ERROR] Docker Desktop engine took longer than 90 seconds to respond.
+    echo Please look at your Windows system tray (near the clock) for Docker Desktop.
+    echo Wait until the whale icon shows 'Engine running', then run this setup again.
+    echo.
+    pause
+    exit /b 1
+)
+goto WAIT_DOCKER_LOOP
+
+:DOCKER_NOT_INSTALLED
 :: Docker Desktop is not installed
 echo =====================================================================
 echo [ATTENTION] Docker Desktop is not installed on this PC or laptop!

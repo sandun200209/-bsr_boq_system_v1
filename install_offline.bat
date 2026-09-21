@@ -24,33 +24,41 @@ if not exist "offline_bundle\docker_images.tar" (
 
 :: 2. Check Docker Desktop
 docker info >nul 2>&1
-if %ERRORLEVEL% NEQ 0 (
-    echo Docker Desktop is not currently running. Attempting to start it...
-    if exist "C:\Program Files\Docker\Docker\Docker Desktop.exe" (
-        start "" "C:\Program Files\Docker\Docker\Docker Desktop.exe"
-        echo Waiting for Docker Desktop engine to start (up to 90 seconds)...
-        set WAITED=0
-        :WAIT_DOCKER_OFFLINE
-        timeout /t 3 /nobreak >nul
-        docker info >nul 2>&1
-        if %ERRORLEVEL% EQU 0 goto DOCKER_OFFLINE_READY
-        set /a WAITED+=3
-        echo   Waiting... (!WAITED!s)
-        if !WAITED! GEQ 90 (
-            echo.
-            echo [ERROR] Docker Desktop took too long to start.
-            echo Please open Docker Desktop manually, wait until it says 'Engine running', and run this script again.
-            pause
-            exit /b 1
-        )
-        goto WAIT_DOCKER_OFFLINE
-    ) else (
-        echo [ERROR] Docker Desktop is not installed on this PC!
-        echo Please install Docker Desktop first.
-        pause
-        exit /b 1
-    )
+if %ERRORLEVEL% EQU 0 goto DOCKER_OFFLINE_READY
+
+set "DOCKER_EXE="
+if exist "C:\Program Files\Docker\Docker\Docker Desktop.exe" (
+    set "DOCKER_EXE=C:\Program Files\Docker\Docker\Docker Desktop.exe"
+) else if exist "%LOCALAPPDATA%\Programs\Docker\Docker\Docker Desktop.exe" (
+    set "DOCKER_EXE=%LOCALAPPDATA%\Programs\Docker\Docker\Docker Desktop.exe"
 )
+
+if "%DOCKER_EXE%"=="" (
+    echo [ERROR] Docker Desktop is not installed on this PC!
+    echo Please install Docker Desktop first.
+    pause
+    exit /b 1
+)
+
+echo Docker Desktop is not currently running. Attempting to start it...
+start "" "%DOCKER_EXE%"
+echo Waiting for Docker Desktop engine to start (up to 90 seconds)...
+set WAITED=0
+
+:WAIT_DOCKER_OFFLINE
+ping 127.0.0.1 -n 4 >nul
+docker info >nul 2>&1
+if %ERRORLEVEL% EQU 0 goto DOCKER_OFFLINE_READY
+set /a WAITED+=3
+echo   Waiting... (!WAITED!s)
+if !WAITED! GEQ 90 (
+    echo.
+    echo [ERROR] Docker Desktop took too long to start.
+    echo Please open Docker Desktop manually, wait until it says 'Engine running', and run this script again.
+    pause
+    exit /b 1
+)
+goto WAIT_DOCKER_OFFLINE
 
 :DOCKER_OFFLINE_READY
 echo [SUCCESS] Docker Desktop engine is ready.

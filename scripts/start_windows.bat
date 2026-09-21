@@ -11,34 +11,45 @@ cd /d "%~dp0\.."
 
 :: Check if Docker daemon is running
 docker info >nul 2>&1
-if %ERRORLEVEL% NEQ 0 (
-    if exist "C:\Program Files\Docker\Docker\Docker Desktop.exe" (
-        echo [INFO] Docker Desktop is not running. Starting Docker Desktop automatically...
-        start "" "C:\Program Files\Docker\Docker\Docker Desktop.exe"
-        echo Waiting for Docker Desktop engine to become ready...
-        set WAITED=0
-        :WAIT_START_DOCKER
-        timeout /t 3 /nobreak >nul
-        docker info >nul 2>&1
-        if %ERRORLEVEL% EQU 0 goto START_DOCKER_READY
-        set /a WAITED+=3
-        echo   Initializing engine... (!WAITED!s)
-        if !WAITED! GEQ 75 (
-            echo.
-            echo [ERROR] Docker Desktop took too long to respond.
-            echo Please open Docker Desktop manually, ensure it says 'Engine running', and run this again.
-            pause
-            exit /b 1
-        )
-        goto WAIT_START_DOCKER
-    ) else (
-        echo [ERROR] Docker Desktop is not installed on this PC!
-        echo Please run 'INSTALL_ON_NEW_PC.bat' to set up Docker Desktop and this application.
-        echo.
-        pause
-        exit /b 1
-    )
+if %ERRORLEVEL% EQU 0 goto START_DOCKER_READY
+
+:: Docker is not running. Find Docker Desktop executable
+set "DOCKER_EXE="
+if exist "C:\Program Files\Docker\Docker\Docker Desktop.exe" (
+    set "DOCKER_EXE=C:\Program Files\Docker\Docker\Docker Desktop.exe"
+) else if exist "%LOCALAPPDATA%\Programs\Docker\Docker\Docker Desktop.exe" (
+    set "DOCKER_EXE=%LOCALAPPDATA%\Programs\Docker\Docker\Docker Desktop.exe"
 )
+
+if "%DOCKER_EXE%"=="" (
+    echo [ERROR] Docker Desktop was not found at standard installation locations!
+    echo Please open Docker Desktop manually from your Start Menu, wait until it says 'Engine running', and run this again.
+    echo.
+    pause
+    exit /b 1
+)
+
+echo [INFO] Docker Desktop is not running. Starting Docker Desktop automatically...
+start "" "%DOCKER_EXE%"
+echo Waiting for Docker Desktop engine to become ready (up to 90 seconds)...
+
+set WAITED=0
+
+:WAIT_START_DOCKER
+ping 127.0.0.1 -n 4 >nul
+docker info >nul 2>&1
+if %ERRORLEVEL% EQU 0 goto START_DOCKER_READY
+
+set /a WAITED+=3
+echo   Initializing engine... (!WAITED!s)
+if !WAITED! GEQ 90 (
+    echo.
+    echo [ERROR] Docker Desktop took too long to respond.
+    echo Please open Docker Desktop manually, ensure it says 'Engine running', and run this again.
+    pause
+    exit /b 1
+)
+goto WAIT_START_DOCKER
 
 :START_DOCKER_READY
 
@@ -59,7 +70,7 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 :: Verify backend is running and healthy
-timeout /t 3 /nobreak >nul
+ping 127.0.0.1 -n 4 >nul
 docker compose exec -T backend python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')" >nul 2>&1
 if %ERRORLEVEL% NEQ 0 (
     echo [INFO] Backend needs rebuild to sync dependencies. Rebuilding...
@@ -67,7 +78,7 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 echo [3/4] Ensuring database schema and rate quality are synchronized...
-timeout /t 2 /nobreak >nul
+ping 127.0.0.1 -n 3 >nul
 docker compose exec -T backend alembic upgrade head >nul 2>&1
 if %ERRORLEVEL% NEQ 0 (
     docker compose exec -T backend alembic stamp head >nul 2>&1
