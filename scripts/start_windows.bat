@@ -58,6 +58,14 @@ if %ERRORLEVEL% NEQ 0 (
     exit /b 1
 )
 
+:: Verify backend is running and healthy
+timeout /t 3 /nobreak >nul
+docker compose exec -T backend python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')" >nul 2>&1
+if %ERRORLEVEL% NEQ 0 (
+    echo [INFO] Backend needs rebuild to sync dependencies. Rebuilding...
+    docker compose up -d --build
+)
+
 echo [3/4] Ensuring database schema and rate quality are synchronized...
 timeout /t 2 /nobreak >nul
 docker compose exec -T backend alembic upgrade head >nul 2>&1
