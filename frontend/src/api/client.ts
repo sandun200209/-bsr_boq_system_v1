@@ -59,6 +59,48 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
+async function downloadFile(path: string, body: any, defaultFilename: string): Promise<void> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    let errorDetail = 'File download failed';
+    try {
+      const data = await res.json();
+      errorDetail = data.detail || data.message || errorDetail;
+    } catch {
+      errorDetail = await res.text();
+    }
+    throw new Error(errorDetail);
+  }
+
+  const disposition = res.headers.get('Content-Disposition');
+  let filename = defaultFilename;
+  if (disposition && disposition.includes('filename=')) {
+    const match = disposition.match(/filename="?([^";]+)"?/);
+    if (match && match[1]) filename = match[1];
+  }
+
+  const blob = await res.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+}
+
 export const api = {
   // Authentication
   login: (username_or_email: string, password: string) =>
@@ -362,4 +404,42 @@ export const api = {
 
   getMasterSuggestions: (limit?: number) =>
     request<MasterSuggestion[]>(`/master-items/suggestions/unmapped?limit=${limit || 20}`),
+
+  // Master Template QS Export
+  getExportPackages: () =>
+    request<{ packages: any[] }>('/export/packages'),
+
+  getExportPreview: (packageKey: string) =>
+    request<any>(`/export/preview/${packageKey}`),
+
+  downloadExportExcel: (options: {
+    package_key: string;
+    project_title?: string;
+    source_note?: string;
+    contingency_rate?: number;
+    items?: any[];
+    reconciliation_items?: any[];
+    vat_status?: string;
+  }) =>
+    downloadFile(
+      '/export/excel',
+      options,
+      `Matara_OT_Consolidated_BOQ_${options.package_key}.xlsx`
+    ),
+
+  downloadExportPdf: (options: {
+    package_key: string;
+    variant?: 'combined' | 'boq' | 'reconciliation';
+    project_title?: string;
+    source_note?: string;
+    contingency_rate?: number;
+    items?: any[];
+    reconciliation_items?: any[];
+    vat_status?: string;
+  }) =>
+    downloadFile(
+      '/export/pdf',
+      options,
+      `Matara_OT_Consolidated_${options.package_key}_${options.variant || 'combined'}.pdf`
+    ),
 };

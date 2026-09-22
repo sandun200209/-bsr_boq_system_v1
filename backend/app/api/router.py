@@ -10,6 +10,7 @@ from .rates import router as rates_router
 from .compare import router as compare_router
 from .review import router as review_router
 from .master_items import router as master_items_router
+from .export import router as export_router
 
 api_router = APIRouter()
 api_router.include_router(health_router)
@@ -22,3 +23,4 @@ api_router.include_router(rates_router)
 api_router.include_router(compare_router)
 api_router.include_router(review_router)
 api_router.include_router(master_items_router)
+api_router.include_router(export_router)

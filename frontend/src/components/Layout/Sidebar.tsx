@@ -5,6 +5,7 @@ import {
   Search,
   GitCompare,
   CheckSquare,
+  FileSpreadsheet,
   FileText,
   Layers,
   Settings as SettingsIcon,
@@ -44,6 +45,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'search', label: 'Rate Search', icon: Search },
     { id: 'compare', label: 'Compare Rates', icon: GitCompare },
     { id: 'review', label: 'Review Queue', icon: CheckSquare, badge: reviewCount },
+    { id: 'export', label: 'QS Reports & Export', icon: FileSpreadsheet },
     { id: 'sources', label: 'Source Files', icon: FileText },
     { id: 'master', label: 'Master Items', icon: Layers },
   ];

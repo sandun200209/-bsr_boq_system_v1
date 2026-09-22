@@ -6,6 +6,7 @@ import {
   Edit2,
   RefreshCw,
   Lock,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { api } from '../api/client';
 import { RateItem } from '../types';
@@ -15,11 +16,13 @@ import { useAuth } from '../context/AuthContext';
 interface ReviewQueuePageProps {
   initialFileId?: number;
   onRefreshMetrics?: () => void;
+  onNavigate?: (tab: string, params?: any) => void;
 }
 
 export const ReviewQueuePage: React.FC<ReviewQueuePageProps> = ({
   initialFileId,
   onRefreshMetrics,
+  onNavigate,
 }) => {
   const { user, hasRole } = useAuth();
   const canReview = hasRole(['ADMIN', 'MANAGER']);
@@ -207,6 +210,15 @@ export const ReviewQueuePage: React.FC<ReviewQueuePageProps> = ({
           >
             <X className="w-3.5 h-3.5" />
             <span>Reject Selected ({selectedIds.length})</span>
+          </button>
+
+          <button
+            onClick={() => onNavigate && onNavigate('export', { source_file_id: initialFileId, sector: sectorFilter })}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-teal-600 hover:bg-teal-500 text-white shadow-xs transition-all cursor-pointer"
+            title="Export items to QS Master Excel / PDF format"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            <span>Export Master BOQ</span>
           </button>
         </div>
       </div>

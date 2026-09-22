@@ -13,6 +13,7 @@ import { SourceFilesPage } from './pages/SourceFilesPage';
 import { MasterItemsPage } from './pages/MasterItemsPage';
 import { UserManagementPage } from './pages/UserManagementPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { ExportReportPage } from './pages/ExportReportPage';
 import { api } from './api/client';
 import { HardHat, Loader2 } from 'lucide-react';
 
@@ -142,8 +143,10 @@ const MainApp: React.FC = () => {
             <ReviewQueuePage
               initialFileId={navigationParams?.source_file_id}
               onRefreshMetrics={refreshMetrics}
+              onNavigate={handleNavigate}
             />
           )}
+          {activeTab === 'export' && <ExportReportPage />}
           {activeTab === 'sources' && (
             <SourceFilesPage
               onNavigateToReview={(fileId) => handleNavigate('review', { source_file_id: fileId })}
