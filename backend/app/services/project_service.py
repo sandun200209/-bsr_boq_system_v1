@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 import json
 import math
 from datetime import datetime
@@ -48,6 +48,10 @@ def get_or_create_default_project(db: Session) -> Project:
         )
     )
     if proj:
+        if "Updated Title" in proj.project_name or "Temporary Test Title" in proj.project_name:
+            proj.project_name = "DGH Matara - Operating Theatre Renovation & Consolidation"
+            db.commit()
+            db.refresh(proj)
         return proj
 
     proj = Project(

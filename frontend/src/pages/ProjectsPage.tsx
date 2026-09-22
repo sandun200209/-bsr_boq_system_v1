@@ -282,6 +282,13 @@ export const ProjectsPage: React.FC = () => {
 
   const currentSection = selectedProject?.sections?.find((s: any) => s.id === activeSectionId);
 
+  const getSectionTabTitle = (name: string) => {
+    if (!name) return '';
+    if (name.includes('SITE WORKS BOQ REVIEWED FOR DUPLICATION')) return 'Site Works Duplication';
+    if (name.includes('REV 7 CONSOLIDATION CHANGE / DUPLICATION REGISTER')) return 'REV 7 Change Register';
+    return name;
+  };
+
   if (loading && projects.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -325,7 +332,7 @@ export const ProjectsPage: React.FC = () => {
                 }
               }
             }}
-            className="text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 text-slate-700"
+            className="text-xs font-semibold px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 text-slate-700 max-w-[280px] sm:max-w-[360px] truncate"
           >
             {projects.map((p) => (
               <option key={p.id} value={p.id}>
@@ -357,52 +364,70 @@ export const ProjectsPage: React.FC = () => {
 
       {/* Project Meta & Rule Indicator Card */}
       {selectedProject && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-center gap-3">
-            <div className="p-3 bg-amber-50 rounded-lg text-amber-600 border border-amber-200">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-start gap-3">
+            <div className="p-3 bg-amber-50 rounded-lg text-amber-600 border border-amber-200 shrink-0 mt-0.5">
               <Calendar className="w-5 h-5" />
             </div>
-            <div>
+            <div className="min-w-0 flex-1">
               <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Project Base Year</div>
               <div className="text-xl font-extrabold text-slate-900">{selectedProject.project_base_year}</div>
               <div className="text-[10px] text-amber-700 font-medium">Distinct from Rate Source Years</div>
             </div>
           </div>
 
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-center gap-3">
-            <div className="p-3 bg-emerald-50 rounded-lg text-emerald-600 border border-emerald-200">
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-start gap-3">
+            <div className="p-3 bg-emerald-50 rounded-lg text-emerald-600 border border-emerald-200 shrink-0 mt-0.5">
               <Building className="w-5 h-5" />
             </div>
-            <div>
+            <div className="min-w-0 flex-1">
               <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Project Location</div>
-              <div className="text-sm font-bold text-slate-800 truncate">{selectedProject.location}</div>
-              <div className="text-[10px] text-slate-500">Status: {selectedProject.status}</div>
+              <div
+                className="text-sm font-bold text-slate-800 break-words leading-snug"
+                title={selectedProject.location}
+              >
+                {selectedProject.location}
+              </div>
+              <div className="flex items-center gap-1.5 mt-1.5">
+                <span className="text-[10px] text-slate-400 font-medium">Status:</span>
+                <span
+                  className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide ${
+                    selectedProject.status === 'APPROVED'
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                      : selectedProject.status === 'IN_REVIEW'
+                      ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                      : 'bg-slate-100 text-slate-700 border border-slate-200'
+                  }`}
+                >
+                  {selectedProject.status?.replace('_', ' ')}
+                </span>
+              </div>
             </div>
           </div>
 
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-center gap-3">
-            <div className="p-3 bg-blue-50 rounded-lg text-blue-600 border border-blue-200">
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-start gap-3">
+            <div className="p-3 bg-blue-50 rounded-lg text-blue-600 border border-blue-200 shrink-0 mt-0.5">
               <Sliders className="w-5 h-5" />
             </div>
-            <div>
+            <div className="min-w-0 flex-1">
               <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Contingency & VAT</div>
               <div className="text-sm font-bold text-slate-800">
                 {(selectedProject.contingency_rate * 100).toFixed(0)}% Contingency
               </div>
-              <div className="text-[10px] text-slate-500">VAT: {selectedProject.vat_status}</div>
+              <div className="text-[10px] text-slate-500 mt-0.5">VAT: {selectedProject.vat_status}</div>
             </div>
           </div>
 
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-center gap-3">
-            <div className="p-3 bg-teal-50 rounded-lg text-teal-600 border border-teal-200">
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-start gap-3">
+            <div className="p-3 bg-teal-50 rounded-lg text-teal-600 border border-teal-200 shrink-0 mt-0.5">
               <DollarSign className="w-5 h-5" />
             </div>
-            <div>
+            <div className="min-w-0 flex-1">
               <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Est. (incl. 10%)</div>
               <div className="text-lg font-black text-teal-700 font-mono">
                 LKR {Number(selectedProject.total_estimate || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
               </div>
-              <div className="text-[10px] text-teal-600">{selectedProject.sections?.length || 0} Sections Classified</div>
+              <div className="text-[10px] text-teal-600 mt-0.5">{selectedProject.sections?.length || 0} Sections Classified</div>
             </div>
           </div>
         </div>
@@ -410,9 +435,9 @@ export const ProjectsPage: React.FC = () => {
 
       {/* Main Workspace: Sections & Data Table */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-        {/* Section Tabs Header */}
-        <div className="p-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-1.5 overflow-x-auto">
+        {/* Section Tabs & Export Actions Header */}
+        <div className="p-3 bg-slate-50 border-b border-slate-200 flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 xl:pb-0 scrollbar-thin">
             {selectedProject?.sections?.map((sec: any) => {
               const isSelected = sec.id === activeSectionId;
               let badgeColor = 'bg-slate-200 text-slate-700';
@@ -424,13 +449,14 @@ export const ProjectsPage: React.FC = () => {
                 <button
                   key={sec.id}
                   onClick={() => setActiveSectionId(sec.id)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 border transition-all ${
+                  title={sec.section_name}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 border transition-all whitespace-nowrap shrink-0 ${
                     isSelected
                       ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
                       : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
                   }`}
                 >
-                  <span>{sec.section_name}</span>
+                  <span>{getSectionTabTitle(sec.section_name)}</span>
                   <span
                     className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
                       isSelected ? 'bg-blue-800 text-blue-100' : badgeColor
@@ -444,7 +470,7 @@ export const ProjectsPage: React.FC = () => {
 
             <button
               onClick={() => setShowAddSectionModal(true)}
-              className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-blue-600 hover:bg-blue-50 border border-dashed border-blue-300 flex items-center gap-1"
+              className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-blue-600 hover:bg-blue-50 border border-dashed border-blue-300 flex items-center gap-1 shrink-0 whitespace-nowrap"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Add Section</span>
@@ -452,11 +478,11 @@ export const ProjectsPage: React.FC = () => {
           </div>
 
           {/* Export Actions for Active Project */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0 self-end xl:self-center">
             <button
               onClick={handleExportCurrentSection}
               disabled={exporting}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-300 hover:bg-slate-100 text-slate-800 font-semibold text-xs transition-colors cursor-pointer shadow-xs disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-300 hover:bg-slate-100 text-slate-800 font-semibold text-xs transition-colors cursor-pointer shadow-xs disabled:opacity-50 whitespace-nowrap"
               title="Export Option B: Separate Excel file for this active section only"
             >
               <FileSpreadsheet className="w-3.5 h-3.5 text-blue-600" />
@@ -466,7 +492,7 @@ export const ProjectsPage: React.FC = () => {
             <button
               onClick={handleExportConsolidated}
               disabled={exporting}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-colors cursor-pointer shadow-sm disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-colors cursor-pointer shadow-sm disabled:opacity-50 whitespace-nowrap"
               title="Export Option A: One Excel workbook with each section as a separate worksheet"
             >
               <Download className="w-3.5 h-3.5" />

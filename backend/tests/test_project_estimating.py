@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 import io
 import openpyxl
 import pytest
@@ -77,13 +77,19 @@ class TestProjectEstimatingAndTemplateExport:
         orig_rate = item2.selected_rate
         orig_year = item2.rate_source_year
 
-        # Simulate editing project base year or other fields
-        default_project.project_name = "DGH Matara - Updated Title"
-        db_session.commit()
-        db_session.refresh(item2)
+        orig_title = default_project.project_name
 
-        assert item2.selected_rate == orig_rate
-        assert item2.rate_source_year == orig_year
+        try:
+            # Simulate editing project base year or other fields
+            default_project.project_name = "DGH Matara - Temporary Test Title"
+            db_session.commit()
+            db_session.refresh(item2)
+
+            assert item2.selected_rate == orig_rate
+            assert item2.rate_source_year == orig_year
+        finally:
+            default_project.project_name = orig_title
+            db_session.commit()
 
     def test_independent_project_sections(self, default_project):
         """
