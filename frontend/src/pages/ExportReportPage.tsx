@@ -7,7 +7,6 @@ import {
   AlertTriangle,
   Layers,
   Settings2,
-  Eye,
   ShieldCheck,
   Zap,
   Droplets,
@@ -16,6 +15,9 @@ import {
   CloudRain,
   Wrench,
   Loader2,
+  CheckSquare,
+  Square,
+  Sparkles,
 } from 'lucide-react';
 import { api } from '../api/client';
 
@@ -31,6 +33,11 @@ interface ExportPackage {
   recon_columns: string[];
 }
 
+interface ExportReportPageProps {
+  initialSelectedIds?: number[];
+  initialPackage?: string;
+}
+
 const PACKAGE_ICONS: Record<string, React.ReactNode> = {
   electrical: <Zap className="w-5 h-5 text-amber-500" />,
   water_supply: <Droplets className="w-5 h-5 text-blue-500" />,
@@ -41,9 +48,12 @@ const PACKAGE_ICONS: Record<string, React.ReactNode> = {
   all: <Layers className="w-5 h-5 text-indigo-500" />,
 };
 
-export const ExportReportPage: React.FC = () => {
+export const ExportReportPage: React.FC<ExportReportPageProps> = ({
+  initialSelectedIds,
+  initialPackage = 'electrical',
+}) => {
   const [packages, setPackages] = useState<ExportPackage[]>([]);
-  const [selectedPkgId, setSelectedPkgId] = useState<string>('electrical');
+  const [selectedPkgId, setSelectedPkgId] = useState<string>(initialPackage);
   const [, setLoadingPackages] = useState<boolean>(true);
 
   // Customization controls
@@ -53,9 +63,17 @@ export const ExportReportPage: React.FC = () => {
   const [vatStatus, setVatStatus] = useState<string>('Excluded');
   const [showSettings, setShowSettings] = useState<boolean>(false);
 
-  // Preview data
-  const [previewData, setPreviewData] = useState<any>(null);
-  const [loadingPreview, setLoadingPreview] = useState<boolean>(false);
+  // Data source mode: 'template' (audited baseline) or 'selected_rates' (from user selection)
+  const [dataSourceMode, setDataSourceMode] = useState<'template' | 'selected_rates'>(
+    initialSelectedIds && initialSelectedIds.length > 0 ? 'selected_rates' : 'template'
+  );
+
+  // Editable BOQ line items
+  const [boqItems, setBoqItems] = useState<any[]>([]);
+  // Editable Reconciliation matrix items with approval flag
+  const [reconRows, setReconRows] = useState<{ data: string[]; approved: boolean }[]>([]);
+
+  const [loadingData, setLoadingData] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'boq' | 'reconciliation'>('boq');
 
   // Download loading states
@@ -70,11 +88,10 @@ export const ExportReportPage: React.FC = () => {
         setLoadingPackages(true);
         const res = await api.getExportPackages();
         setPackages(res.packages);
-        if (res.packages.length > 0) {
-          const first = res.packages[0];
-          setSelectedPkgId(first.id);
-          setProjectTitle(first.default_title);
-          setSourceNote(first.default_note);
+        const current = res.packages.find((p) => p.id === selectedPkgId) || res.packages[0];
+        if (current) {
+          setProjectTitle(current.default_title);
+          setSourceNote(current.default_note);
         }
       } catch (err: any) {
         setErrorMessage(err.message || 'Failed to load export packages');
@@ -85,25 +102,74 @@ export const ExportReportPage: React.FC = () => {
     fetchPackages();
   }, []);
 
-  // Load preview data whenever selected package changes
+  // Load or switch data whenever package or data source changes
   useEffect(() => {
     if (!selectedPkgId) return;
-    const loadPreview = async () => {
+
+    const loadData = async () => {
       try {
-        setLoadingPreview(true);
+        setLoadingData(true);
         setErrorMessage(null);
-        const data = await api.getExportPreview(selectedPkgId);
-        setPreviewData(data);
-        setProjectTitle(data.project_title);
-        setSourceNote(data.source_note);
+
+        if (dataSourceMode === 'selected_rates' && initialSelectedIds && initialSelectedIds.length > 0) {
+          // Fetch selected rate items from database
+          const res = await api.searchRates({
+            page: 1,
+            page_size: 200,
+          });
+
+          // Match by selected IDs
+          const idSet = new Set(initialSelectedIds);
+          const matched = res.items.filter((it) => idSet.has(it.id));
+
+          const mapped = matched.map((it, idx) => {
+            const srcQty = 1.0;
+            const rRate = it.rate || 0.0;
+            const dupQty = 0.0;
+            const revQty = srcQty - dupQty;
+            return {
+              source_row: it.source_row || idx + 1,
+              item: it.item_code || `${idx + 1}`,
+              description: it.description || 'Rate Item',
+              unit: it.unit || 'Item',
+              source_qty: srcQty,
+              rate: rRate,
+              source_amount: srcQty * rRate,
+              duplicate_qty: dupQty,
+              duplicate_amount: dupQty * rRate,
+              reviewed_qty: revQty,
+              reviewed_amount: revQty * rRate,
+              overlap_reason: it.validation_notes || '',
+              action: 'RETAIN',
+              confidence: (it.confidence_score || 1.0) >= 0.8 ? 'High' : 'Medium',
+              remarks: `Selected from BSR Hub (${it.validation_status})`,
+            };
+          });
+
+          setBoqItems(mapped);
+
+          // Also load package template recon items
+          const tpl = await api.getExportPreview(selectedPkgId);
+          setReconRows((tpl.recon_items || []).map((r: string[]) => ({ data: r, approved: true })));
+          setProjectTitle(tpl.project_title);
+          setSourceNote(tpl.source_note);
+        } else {
+          // Load reference template baseline data
+          const data = await api.getExportPreview(selectedPkgId);
+          setBoqItems(data.boq_items || []);
+          setReconRows((data.recon_items || []).map((r: string[]) => ({ data: r, approved: true })));
+          setProjectTitle(data.project_title);
+          setSourceNote(data.source_note);
+        }
       } catch (err: any) {
-        setErrorMessage(err.message || 'Failed to load preview data');
+        setErrorMessage(err.message || 'Failed to load export data');
       } finally {
-        setLoadingPreview(false);
+        setLoadingData(false);
       }
     };
-    loadPreview();
-  }, [selectedPkgId]);
+
+    loadData();
+  }, [selectedPkgId, dataSourceMode]);
 
   const handlePackageChange = (pkgId: string) => {
     setSelectedPkgId(pkgId);
@@ -113,6 +179,60 @@ export const ExportReportPage: React.FC = () => {
       setSourceNote(p.default_note);
     }
   };
+
+  // Inline editing handlers for BOQ items
+  const handleItemChange = (idx: number, field: string, value: any) => {
+    setBoqItems((prev) => {
+      const copy = [...prev];
+      const it = { ...copy[idx] };
+
+      if (field === 'source_qty') {
+        const num = parseFloat(value) || 0.0;
+        it.source_qty = num;
+        it.source_amount = num * it.rate;
+        it.reviewed_qty = Math.max(0, num - it.duplicate_qty);
+        it.reviewed_amount = it.reviewed_qty * it.rate;
+      } else if (field === 'duplicate_qty') {
+        const num = parseFloat(value) || 0.0;
+        it.duplicate_qty = num;
+        it.duplicate_amount = num * it.rate;
+        it.reviewed_qty = Math.max(0, it.source_qty - num);
+        it.reviewed_amount = it.reviewed_qty * it.rate;
+        if (num > 0 && it.action === 'RETAIN') it.action = 'REDUCE';
+      } else if (field === 'reviewed_qty') {
+        const num = parseFloat(value) || 0.0;
+        it.reviewed_qty = num;
+        it.reviewed_amount = num * it.rate;
+      } else if (field === 'rate') {
+        const num = parseFloat(value) || 0.0;
+        it.rate = num;
+        it.source_amount = it.source_qty * num;
+        it.duplicate_amount = it.duplicate_qty * num;
+        it.reviewed_amount = it.reviewed_qty * num;
+      } else {
+        it[field] = value;
+      }
+
+      copy[idx] = it;
+      return copy;
+    });
+  };
+
+  // Reconciliation approval toggle
+  const handleToggleReconApproval = (idx: number) => {
+    setReconRows((prev) => {
+      const copy = [...prev];
+      copy[idx] = { ...copy[idx], approved: !copy[idx].approved };
+      return copy;
+    });
+  };
+
+  const handleSelectAllRecon = (approved: boolean) => {
+    setReconRows((prev) => prev.map((r) => ({ ...r, approved })));
+  };
+
+  // Export handlers
+  const approvedReconItems = reconRows.filter((r) => r.approved).map((r) => r.data);
 
   const handleDownloadExcel = async () => {
     try {
@@ -124,9 +244,11 @@ export const ExportReportPage: React.FC = () => {
         project_title: projectTitle,
         source_note: sourceNote,
         contingency_rate: contingencyRate,
+        items: boqItems,
+        reconciliation_items: approvedReconItems,
         vat_status: vatStatus,
       });
-      setSuccessMessage('Master Excel workbook (.xlsx) downloaded successfully!');
+      setSuccessMessage('Master Excel workbook (.xlsx) cloned and downloaded successfully!');
       setTimeout(() => setSuccessMessage(null), 5000);
     } catch (err: any) {
       setErrorMessage(err.message || 'Excel export failed');
@@ -146,6 +268,8 @@ export const ExportReportPage: React.FC = () => {
         project_title: projectTitle,
         source_note: sourceNote,
         contingency_rate: contingencyRate,
+        items: boqItems,
+        reconciliation_items: approvedReconItems,
         vat_status: vatStatus,
       });
       const label =
@@ -163,13 +287,10 @@ export const ExportReportPage: React.FC = () => {
     }
   };
 
-  // Compute live preview metrics
-  const boqItems: any[] = previewData?.boq_items || [];
-  const reconItems: any[] = previewData?.recon_items || [];
-
-  const grossTotal = boqItems.reduce((sum, it) => sum + (it.source_amount || (it.source_qty * it.rate) || 0), 0);
-  const dupTotal = boqItems.reduce((sum, it) => sum + (it.duplicate_amount || (it.duplicate_qty * it.rate) || 0), 0);
-  const netSubtotal = boqItems.reduce((sum, it) => sum + (it.reviewed_amount || (it.reviewed_qty * it.rate) || (it.source_qty * it.rate) || 0), 0);
+  // Compute live metrics
+  const grossTotal = boqItems.reduce((sum, it) => sum + (it.source_amount || it.source_qty * it.rate || 0), 0);
+  const dupTotal = boqItems.reduce((sum, it) => sum + (it.duplicate_amount || it.duplicate_qty * it.rate || 0), 0);
+  const netSubtotal = boqItems.reduce((sum, it) => sum + (it.reviewed_amount || it.reviewed_qty * it.rate || 0), 0);
   const contingencyAmt = netSubtotal * contingencyRate;
   const estimateTotal = netSubtotal + contingencyAmt;
 
@@ -191,23 +312,24 @@ export const ExportReportPage: React.FC = () => {
               QS Engineering Reports & Master Export
             </h1>
             <p className="text-slate-300 text-sm max-w-2xl leading-relaxed">
-              Reproduces the exact workbook structure, sheet separation, column order, title layout,
-              text wrapping, number formats, and professional QS calculations as the reference workbook.
+              Takes only the 2 target worksheets (BOQ Reviewed & Scope Reconciliation), clones them into a clean
+              new workbook, populates review fields, and calculates live formulas without modifying the master template.
             </p>
           </div>
 
-          {/* Quick Settings Toggle */}
-          <button
-            onClick={() => setShowSettings(!showSettings)}
-            className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all shadow-md ${
-              showSettings
-                ? 'bg-teal-600 text-white shadow-teal-500/20 ring-2 ring-teal-400'
-                : 'bg-white/10 text-white hover:bg-white/20 backdrop-blur-md'
-            }`}
-          >
-            <Settings2 className="w-4 h-4" />
-            <span>Customize Report Meta</span>
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowSettings(!showSettings)}
+              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all shadow-md ${
+                showSettings
+                  ? 'bg-teal-600 text-white shadow-teal-500/20 ring-2 ring-teal-400'
+                  : 'bg-white/10 text-white hover:bg-white/20 backdrop-blur-md'
+              }`}
+            >
+              <Settings2 className="w-4 h-4" />
+              <span>Report Titles & Notes</span>
+            </button>
+          </div>
         </div>
 
         {/* Customization Drawer */}
@@ -280,8 +402,9 @@ export const ExportReportPage: React.FC = () => {
         </div>
       )}
 
-      {/* Package Selector Bar */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-3">
+      {/* Data Source Switcher & Package Bar */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-3 flex flex-col md:flex-row md:items-center justify-between gap-3">
+        {/* Package Tabs */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
           {packages.map((pkg) => {
             const isSelected = selectedPkgId === pkg.id;
@@ -289,7 +412,7 @@ export const ExportReportPage: React.FC = () => {
               <button
                 key={pkg.id}
                 onClick={() => handlePackageChange(pkg.id)}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold whitespace-nowrap transition-all ${
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
                   isSelected
                     ? 'bg-teal-600 text-white shadow-md shadow-teal-600/20 ring-1 ring-teal-500'
                     : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
@@ -300,6 +423,30 @@ export const ExportReportPage: React.FC = () => {
               </button>
             );
           })}
+        </div>
+
+        {/* Data Source Toggle */}
+        <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-lg shrink-0 text-xs font-semibold">
+          <button
+            onClick={() => setDataSourceMode('template')}
+            className={`px-3 py-1.5 rounded-md transition-all ${
+              dataSourceMode === 'template'
+                ? 'bg-white text-teal-800 shadow-xs'
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            Audited Baseline
+          </button>
+          <button
+            onClick={() => setDataSourceMode('selected_rates')}
+            className={`px-3 py-1.5 rounded-md transition-all ${
+              dataSourceMode === 'selected_rates'
+                ? 'bg-white text-teal-800 shadow-xs'
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            Selected Rate Items ({boqItems.length})
+          </button>
         </div>
       </div>
 
@@ -312,24 +459,24 @@ export const ExportReportPage: React.FC = () => {
               <FileSpreadsheet className="w-6 h-6" />
             </div>
             <div>
-              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600">Master Template</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600">Master 2-Sheet Excel</span>
               <h3 className="text-base font-bold text-slate-900">Excel (.xlsx)</h3>
               <p className="text-xs text-slate-500 mt-1">
-                2 separate worksheets (BOQ Reviewed & Reconciliation) with live formulas, number formats, and exact QS styling.
+                Clones only {currentPkg?.boq_sheet} and {currentPkg?.recon_sheet} with exact formulas, number formats, and QS styling.
               </p>
             </div>
           </div>
           <button
             onClick={handleDownloadExcel}
             disabled={downloadingFormat !== null}
-            className="mt-4 w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 active:bg-emerald-800 disabled:opacity-50 shadow-sm transition-all"
+            className="mt-4 w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 active:bg-emerald-800 disabled:opacity-50 shadow-sm transition-all cursor-pointer"
           >
             {downloadingFormat === 'excel' ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
               <Download className="w-4 h-4" />
             )}
-            <span>Export Excel</span>
+            <span>Export New Excel</span>
           </button>
         </div>
 
@@ -343,14 +490,14 @@ export const ExportReportPage: React.FC = () => {
               <span className="text-[11px] font-bold uppercase tracking-wider text-blue-600">Full Executive</span>
               <h3 className="text-base font-bold text-slate-900">Combined PDF</h3>
               <p className="text-xs text-slate-500 mt-1">
-                Landscape A4 document containing Section 1 (BOQ Reviewed) and Section 2 (Scope Reconciliation).
+                Landscape A4 report containing Section 1 (BOQ Reviewed) and Section 2 (Approved Reconciliation Records).
               </p>
             </div>
           </div>
           <button
             onClick={() => handleDownloadPdf('combined')}
             disabled={downloadingFormat !== null}
-            className="mt-4 w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 shadow-sm transition-all"
+            className="mt-4 w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 shadow-sm transition-all cursor-pointer"
           >
             {downloadingFormat === 'pdf_combined' ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -371,14 +518,14 @@ export const ExportReportPage: React.FC = () => {
               <span className="text-[11px] font-bold uppercase tracking-wider text-teal-600">Section 1 Only</span>
               <h3 className="text-base font-bold text-slate-900">BOQ Reviewed PDF</h3>
               <p className="text-xs text-slate-500 mt-1">
-                Dedicated BOQ line items with deductions, net quantities, and final engineering estimate total.
+                Dedicated BOQ line items with duplicate deductions, net quantities, and final engineering estimate total.
               </p>
             </div>
           </div>
           <button
             onClick={() => handleDownloadPdf('boq')}
             disabled={downloadingFormat !== null}
-            className="mt-4 w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-teal-600 text-white text-sm font-semibold hover:bg-teal-700 active:bg-teal-800 disabled:opacity-50 shadow-sm transition-all"
+            className="mt-4 w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-teal-600 text-white text-sm font-semibold hover:bg-teal-700 active:bg-teal-800 disabled:opacity-50 shadow-sm transition-all cursor-pointer"
           >
             {downloadingFormat === 'pdf_boq' ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -399,14 +546,14 @@ export const ExportReportPage: React.FC = () => {
               <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-600">Section 2 Only</span>
               <h3 className="text-base font-bold text-slate-900">Reconciliation PDF</h3>
               <p className="text-xs text-slate-500 mt-1">
-                Scope boundary matrix detailing interfaces, duplication risks, and tender actions.
+                Scope boundary matrix detailing {approvedReconItems.length} approved interface reconciliation records.
               </p>
             </div>
           </div>
           <button
             onClick={() => handleDownloadPdf('reconciliation')}
             disabled={downloadingFormat !== null}
-            className="mt-4 w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 active:bg-indigo-800 disabled:opacity-50 shadow-sm transition-all"
+            className="mt-4 w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 active:bg-indigo-800 disabled:opacity-50 shadow-sm transition-all cursor-pointer"
           >
             {downloadingFormat === 'pdf_reconciliation' ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -418,7 +565,7 @@ export const ExportReportPage: React.FC = () => {
         </div>
       </div>
 
-      {/* KPI Financial Summary Metrics */}
+      {/* Financial Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
           <div className="text-xs text-slate-500 font-medium">Source BOQ Gross</div>
@@ -456,66 +603,66 @@ export const ExportReportPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Live Data Preview Section */}
+      {/* Interactive Table Area */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        {/* Table View Tabs */}
+        {/* Table View Tabs & Actions */}
         <div className="border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50/50">
           <div className="flex items-center gap-2">
             <button
               onClick={() => setActiveTab('boq')}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
                 activeTab === 'boq'
                   ? 'bg-teal-600 text-white shadow-sm'
                   : 'text-slate-600 hover:bg-slate-200/60'
               }`}
             >
-              Sheet 1: {currentPkg?.boq_sheet || 'BOQ Reviewed'} ({boqItems.length})
+              Sheet 1: {currentPkg?.boq_sheet || 'BOQ Reviewed'} ({boqItems.length} items)
             </button>
             <button
               onClick={() => setActiveTab('reconciliation')}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
                 activeTab === 'reconciliation'
                   ? 'bg-teal-600 text-white shadow-sm'
                   : 'text-slate-600 hover:bg-slate-200/60'
               }`}
             >
-              Sheet 2: {currentPkg?.recon_sheet || 'Reconciliation'} ({reconItems.length})
+              Sheet 2: {currentPkg?.recon_sheet || 'Reconciliation'} ({approvedReconItems.length}/{reconRows.length} approved)
             </button>
           </div>
 
           <div className="text-xs text-slate-500 flex items-center gap-1.5 font-medium">
-            <Eye className="w-4 h-4 text-slate-400" />
-            Live Preview (Exact columns and order reproduced)
+            <Sparkles className="w-4 h-4 text-teal-600" />
+            <span>Review fields and quantities are editable directly in the table below</span>
           </div>
         </div>
 
         {/* Loading Spinner */}
-        {loadingPreview ? (
+        {loadingData ? (
           <div className="p-16 flex flex-col items-center justify-center text-slate-400 space-y-3">
             <Loader2 className="w-8 h-8 animate-spin text-teal-600" />
-            <p className="text-sm font-medium">Loading package preview from master template...</p>
+            <p className="text-sm font-medium">Loading line items and formulas...</p>
           </div>
         ) : activeTab === 'boq' ? (
-          /* BOQ Reviewed Table Preview */
-          <div className="overflow-x-auto">
+          /* BOQ Reviewed Table with Live Editable Fields */
+          <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
             <table className="w-full text-left text-xs text-slate-700 border-collapse">
-              <thead>
+              <thead className="sticky top-0 z-10">
                 <tr className="bg-[#5B9BD5] text-white font-bold text-[11px] border-b border-slate-300">
-                  <th className="p-2.5 text-center whitespace-nowrap">Source Row</th>
+                  <th className="p-2.5 text-center whitespace-nowrap">Row</th>
                   <th className="p-2.5 text-center whitespace-nowrap">Item</th>
-                  <th className="p-2.5 min-w-[280px]">Description</th>
+                  <th className="p-2.5 min-w-[260px]">Description</th>
                   <th className="p-2.5 text-center whitespace-nowrap">Unit</th>
-                  <th className="p-2.5 text-right whitespace-nowrap">Source Qty</th>
-                  <th className="p-2.5 text-right whitespace-nowrap">Rate (LKR)</th>
-                  <th className="p-2.5 text-right whitespace-nowrap">Source Amount</th>
-                  <th className="p-2.5 text-right whitespace-nowrap">Duplicate Qty</th>
-                  <th className="p-2.5 text-right whitespace-nowrap">Duplicate Amount</th>
-                  <th className="p-2.5 text-right whitespace-nowrap">Reviewed Qty</th>
-                  <th className="p-2.5 text-right whitespace-nowrap">Reviewed Amount</th>
-                  <th className="p-2.5 min-w-[220px]">Overlap / Reason</th>
-                  <th className="p-2.5 text-center whitespace-nowrap">Action</th>
-                  <th className="p-2.5 text-center whitespace-nowrap">Confidence</th>
-                  <th className="p-2.5 min-w-[180px]">Remarks</th>
+                  <th className="p-2.5 text-right whitespace-nowrap min-w-[80px]">Source Qty</th>
+                  <th className="p-2.5 text-right whitespace-nowrap min-w-[90px]">Rate (LKR)</th>
+                  <th className="p-2.5 text-right whitespace-nowrap min-w-[90px]">Source Amount</th>
+                  <th className="p-2.5 text-right whitespace-nowrap min-w-[80px]">Duplicate Qty</th>
+                  <th className="p-2.5 text-right whitespace-nowrap min-w-[90px]">Duplicate Amount</th>
+                  <th className="p-2.5 text-right whitespace-nowrap min-w-[80px]">Reviewed Qty</th>
+                  <th className="p-2.5 text-right whitespace-nowrap min-w-[90px]">Reviewed Amount</th>
+                  <th className="p-2.5 min-w-[200px]">Overlap / Reason</th>
+                  <th className="p-2.5 text-center whitespace-nowrap min-w-[100px]">Action</th>
+                  <th className="p-2.5 text-center whitespace-nowrap min-w-[90px]">Confidence</th>
+                  <th className="p-2.5 min-w-[160px]">Remarks</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
@@ -528,41 +675,137 @@ export const ExportReportPage: React.FC = () => {
                   return (
                     <tr
                       key={idx}
-                      className={`hover:bg-slate-50 transition-colors ${
-                        hasDup ? 'bg-amber-50/20' : idx % 2 === 1 ? 'bg-slate-50/50' : 'bg-white'
+                      className={`hover:bg-teal-50/20 transition-colors ${
+                        hasDup ? 'bg-amber-50/30' : idx % 2 === 1 ? 'bg-slate-50/50' : 'bg-white'
                       }`}
                     >
-                      <td className="p-2.5 text-center font-mono text-slate-500">{row.source_row || idx + 1}</td>
-                      <td className="p-2.5 text-center font-mono font-medium text-slate-900">{row.item || '-'}</td>
-                      <td className="p-2.5 text-slate-900 leading-relaxed">{row.description}</td>
-                      <td className="p-2.5 text-center text-slate-600 font-medium">{row.unit}</td>
-                      <td className="p-2.5 text-right font-mono">{Number(row.source_qty).toFixed(2)}</td>
-                      <td className="p-2.5 text-right font-mono font-medium">{Number(row.rate).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                      <td className="p-2.5 text-right font-mono text-slate-700">{srcAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                      <td className={`p-2.5 text-right font-mono ${hasDup ? 'text-rose-600 font-bold' : 'text-slate-400'}`}>
-                        {Number(row.duplicate_qty).toFixed(2)}
+                      {/* Col A: Source Row */}
+                      <td className="p-2 text-center font-mono text-slate-500">{row.source_row || idx + 1}</td>
+
+                      {/* Col B: Item Code */}
+                      <td className="p-2 text-center font-mono font-medium text-slate-900">{row.item || '-'}</td>
+
+                      {/* Col C: Description */}
+                      <td className="p-2 text-slate-900 leading-relaxed font-medium">{row.description}</td>
+
+                      {/* Col D: Unit */}
+                      <td className="p-2 text-center text-slate-600 font-medium">{row.unit}</td>
+
+                      {/* Col E: Source Qty (Editable) */}
+                      <td className="p-2 text-right">
+                        <input
+                          type="number"
+                          step="any"
+                          value={row.source_qty}
+                          onChange={(e) => handleItemChange(idx, 'source_qty', e.target.value)}
+                          className="w-20 text-right font-mono text-xs px-1.5 py-1 rounded border border-slate-200 focus:border-teal-500 focus:outline-none"
+                        />
                       </td>
-                      <td className={`p-2.5 text-right font-mono ${hasDup ? 'text-rose-600 font-bold' : 'text-slate-400'}`}>
+
+                      {/* Col F: Rate (LKR) */}
+                      <td className="p-2 text-right font-mono font-medium text-slate-900">
+                        {Number(row.rate).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </td>
+
+                      {/* Col G: Source Amount (Calculated =E*F) */}
+                      <td className="p-2 text-right font-mono text-slate-700">
+                        {srcAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </td>
+
+                      {/* Col H: Duplicate Qty (Editable) */}
+                      <td className="p-2 text-right">
+                        <input
+                          type="number"
+                          step="any"
+                          value={row.duplicate_qty}
+                          onChange={(e) => handleItemChange(idx, 'duplicate_qty', e.target.value)}
+                          className={`w-20 text-right font-mono text-xs px-1.5 py-1 rounded border focus:outline-none ${
+                            hasDup
+                              ? 'border-rose-300 bg-rose-50 text-rose-700 font-bold'
+                              : 'border-slate-200 text-slate-600'
+                          }`}
+                        />
+                      </td>
+
+                      {/* Col I: Duplicate Amount (Calculated =H*F) */}
+                      <td className={`p-2 text-right font-mono ${hasDup ? 'text-rose-600 font-bold' : 'text-slate-400'}`}>
                         {dupAmt > 0 ? `- ${dupAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '0.00'}
                       </td>
-                      <td className="p-2.5 text-right font-mono font-bold text-teal-700">{Number(row.reviewed_qty).toFixed(2)}</td>
-                      <td className="p-2.5 text-right font-mono font-bold text-teal-700">{revAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                      <td className="p-2.5 text-slate-600 text-[11px] leading-relaxed italic">{row.overlap_reason || '-'}</td>
-                      <td className="p-2.5 text-center">
-                        <span
-                          className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+
+                      {/* Col J: Reviewed Qty (Editable manual override or =E-H) */}
+                      <td className="p-2 text-right">
+                        <input
+                          type="number"
+                          step="any"
+                          value={row.reviewed_qty}
+                          onChange={(e) => handleItemChange(idx, 'reviewed_qty', e.target.value)}
+                          className="w-20 text-right font-mono font-bold text-teal-800 text-xs px-1.5 py-1 rounded border border-teal-200 bg-teal-50/40 focus:outline-none"
+                        />
+                      </td>
+
+                      {/* Col K: Reviewed Amount (Calculated =J*F) */}
+                      <td className="p-2 text-right font-mono font-bold text-teal-700">
+                        {revAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </td>
+
+                      {/* Col L: Overlap / Reason (Editable) */}
+                      <td className="p-2">
+                        <input
+                          type="text"
+                          value={row.overlap_reason}
+                          placeholder="Reason..."
+                          onChange={(e) => handleItemChange(idx, 'overlap_reason', e.target.value)}
+                          className="w-full text-xs px-2 py-1 rounded border border-slate-200 focus:border-teal-500 focus:outline-none text-slate-700"
+                        />
+                      </td>
+
+                      {/* Col M: Action (Dropdown) */}
+                      <td className="p-2 text-center">
+                        <select
+                          value={row.action || 'RETAIN'}
+                          onChange={(e) => handleItemChange(idx, 'action', e.target.value)}
+                          className={`text-[10px] font-bold uppercase rounded px-2 py-1 border focus:outline-none ${
                             row.action === 'REDUCE'
-                              ? 'bg-amber-100 text-amber-800'
+                              ? 'bg-amber-100 border-amber-300 text-amber-800'
                               : row.action === 'DEDUCT'
-                              ? 'bg-rose-100 text-rose-800'
-                              : 'bg-emerald-100 text-emerald-800'
+                              ? 'bg-rose-100 border-rose-300 text-rose-800'
+                              : row.action === 'TRANSFER'
+                              ? 'bg-indigo-100 border-indigo-300 text-indigo-800'
+                              : 'bg-emerald-100 border-emerald-300 text-emerald-800'
                           }`}
                         >
-                          {row.action || 'RETAIN'}
-                        </span>
+                          <option value="RETAIN">RETAIN</option>
+                          <option value="DEDUCT">DEDUCT</option>
+                          <option value="REDUCE">REDUCE</option>
+                          <option value="TRANSFER">TRANSFER</option>
+                          <option value="REVIEW">REVIEW</option>
+                        </select>
                       </td>
-                      <td className="p-2.5 text-center text-slate-600 text-[11px]">{row.confidence || 'High'}</td>
-                      <td className="p-2.5 text-slate-500 text-[11px]">{row.remarks || '-'}</td>
+
+                      {/* Col N: Confidence (Dropdown) */}
+                      <td className="p-2 text-center">
+                        <select
+                          value={row.confidence || 'High'}
+                          onChange={(e) => handleItemChange(idx, 'confidence', e.target.value)}
+                          className="text-[10px] font-medium rounded px-1.5 py-1 border border-slate-200 bg-white text-slate-700 focus:outline-none"
+                        >
+                          <option value="High">High</option>
+                          <option value="Medium/High">Med/High</option>
+                          <option value="Medium">Medium</option>
+                          <option value="Low">Low</option>
+                        </select>
+                      </td>
+
+                      {/* Col O: Remarks (Editable) */}
+                      <td className="p-2">
+                        <input
+                          type="text"
+                          value={row.remarks}
+                          placeholder="Remarks..."
+                          onChange={(e) => handleItemChange(idx, 'remarks', e.target.value)}
+                          className="w-full text-xs px-2 py-1 rounded border border-slate-200 focus:border-teal-500 focus:outline-none text-slate-600"
+                        />
+                      </td>
                     </tr>
                   );
                 })}
@@ -570,11 +813,31 @@ export const ExportReportPage: React.FC = () => {
             </table>
           </div>
         ) : (
-          /* Scope Reconciliation Table Preview */
+          /* Scope Reconciliation Table with Approval Selection */
           <div className="overflow-x-auto">
+            <div className="p-3 bg-slate-100 border-b border-slate-200 flex items-center justify-between text-xs">
+              <span className="font-semibold text-slate-700">
+                Select which reconciliation records are approved for inclusion in Sheet 2:
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleSelectAllRecon(true)}
+                  className="px-2.5 py-1 rounded bg-teal-600 text-white font-semibold hover:bg-teal-700"
+                >
+                  Approve All
+                </button>
+                <button
+                  onClick={() => handleSelectAllRecon(false)}
+                  className="px-2.5 py-1 rounded bg-slate-200 text-slate-700 font-medium hover:bg-slate-300"
+                >
+                  Deselect All
+                </button>
+              </div>
+            </div>
             <table className="w-full text-left text-xs text-slate-700 border-collapse">
               <thead>
                 <tr className="bg-[#5B9BD5] text-white font-bold text-[11px] border-b border-slate-300">
+                  <th className="p-2.5 text-center w-12">Approved</th>
                   <th className="p-2.5 min-w-[160px]">Scope Element</th>
                   <th className="p-2.5 min-w-[160px]">Source BOQ</th>
                   <th className="p-2.5 min-w-[170px]">Other Package</th>
@@ -586,28 +849,48 @@ export const ExportReportPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                {reconItems.map((r, idx) => (
-                  <tr key={idx} className={idx % 2 === 1 ? 'bg-slate-50/50' : 'bg-white'}>
-                    <td className="p-2.5 font-semibold text-slate-900">{r[0]}</td>
-                    <td className="p-2.5 text-slate-700">{r[1]}</td>
-                    <td className="p-2.5 text-slate-700">{r[2]}</td>
-                    <td className="p-2.5 text-teal-800 font-medium">{r[3]}</td>
-                    <td className="p-2.5 font-mono text-rose-600 font-semibold">{r[4]}</td>
-                    <td className="p-2.5 text-slate-600 leading-relaxed">{r[5]}</td>
-                    <td className="p-2.5 text-center">
-                      <span
-                        className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
-                          String(r[6]).toLowerCase().includes('high')
-                            ? 'bg-rose-100 text-rose-800'
-                            : 'bg-amber-100 text-amber-800'
-                        }`}
-                      >
-                        {r[6]}
-                      </span>
-                    </td>
-                    <td className="p-2.5 text-slate-700 leading-relaxed font-medium">{r[7]}</td>
-                  </tr>
-                ))}
+                {reconRows.map((item, idx) => {
+                  const r = item.data;
+                  return (
+                    <tr
+                      key={idx}
+                      className={`hover:bg-teal-50/20 transition-colors ${
+                        item.approved ? 'bg-white' : 'bg-slate-100/60 opacity-60'
+                      }`}
+                    >
+                      <td className="p-2.5 text-center">
+                        <button
+                          onClick={() => handleToggleReconApproval(idx)}
+                          className="cursor-pointer text-teal-700 hover:text-teal-900"
+                        >
+                          {item.approved ? (
+                            <CheckSquare className="w-4 h-4 text-teal-600 inline" />
+                          ) : (
+                            <Square className="w-4 h-4 text-slate-400 inline" />
+                          )}
+                        </button>
+                      </td>
+                      <td className="p-2.5 font-semibold text-slate-900">{r[0]}</td>
+                      <td className="p-2.5 text-slate-700">{r[1]}</td>
+                      <td className="p-2.5 text-slate-700">{r[2]}</td>
+                      <td className="p-2.5 text-teal-800 font-medium">{r[3]}</td>
+                      <td className="p-2.5 font-mono text-rose-600 font-semibold">{r[4]}</td>
+                      <td className="p-2.5 text-slate-600 leading-relaxed">{r[5]}</td>
+                      <td className="p-2.5 text-center">
+                        <span
+                          className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
+                            String(r[6]).toLowerCase().includes('high')
+                              ? 'bg-rose-100 text-rose-800'
+                              : 'bg-amber-100 text-amber-800'
+                          }`}
+                        >
+                          {r[6]}
+                        </span>
+                      </td>
+                      <td className="p-2.5 text-slate-700 leading-relaxed font-medium">{r[7]}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import RateItem, SourceFile, User
-from ..schemas import ExportRequest, ExportPdfRequest
+from ..schemas import ExportRequest, ExportPdfRequest, ExportByIdsRequest
 from ..services.auth_service import get_current_user_optional, log_audit
 from ..services.export_service import (
     PACKAGE_REGISTRY,
@@ -226,6 +226,107 @@ def export_from_database(
             media_type="application/pdf",
             headers={
                 "Content-Disposition": f'attachment; filename="BSR_Hub_Export_{package_key}_{variant}.pdf"',
+                "Access-Control-Expose-Headers": "Content-Disposition",
+            },
+        )
+
+
+@router.post("/by-ids")
+def export_selected_items(
+    payload: ExportByIdsRequest,
+    current_user: User | None = Depends(get_current_user_optional),
+    db: Session = Depends(get_db),
+):
+    """
+    Exports rate items explicitly selected by the user by ID into the master template.
+    Maps:
+      Item Code -> Item
+      Description -> Description
+      Unit -> Unit
+      Rate -> Rate (LKR)
+    Populates project review fields:
+      Source Qty
+      Duplicate Qty
+      Reviewed Qty
+      Overlap / Reason
+      Action
+      Confidence
+      Remarks
+    Calculates Source Amount, Duplicate Amount and Reviewed Amount.
+    Populates the Reconciliation sheet only with approved reconciliation records.
+    Generates a NEW .xlsx file or matching PDF.
+    """
+    if not payload.rate_item_ids:
+        raise HTTPException(status_code=400, detail="No rate items were selected for export.")
+
+    # Retrieve matching items preserving order of IDs
+    items_query = select(RateItem).where(RateItem.id.in_(payload.rate_item_ids))
+    db_items = {it.id: it for it in db.scalars(items_query).all()}
+
+    mapped_items = []
+    for idx, r_id in enumerate(payload.rate_item_ids):
+        it = db_items.get(r_id)
+        if not it:
+            continue
+        mapped_items.append({
+            "source_row": it.source_row or (idx + 1),
+            "item_code": it.item_code or f"{idx+1}",
+            "description": it.description or "Rate Item",
+            "unit": it.unit or "Item",
+            "source_qty": 1.0,
+            "rate": it.rate or 0.0,
+            "duplicate_qty": 0.0,
+            "reviewed_qty": None,  # Computed via =E-H
+            "overlap_reason": it.validation_notes or "",
+            "action": "RETAIN",
+            "confidence": "High" if (it.confidence_score or 1.0) >= 0.8 else "Medium",
+            "remarks": f"Selected from BSR Rate Hub (Status: {it.validation_status})",
+        })
+
+    pkg_name = payload.package_key.capitalize()
+
+    if payload.format == "excel":
+        xlsx_bytes = generate_package_excel(
+            package_key=payload.package_key,
+            project_title=payload.project_title,
+            source_note=payload.source_note,
+            contingency_rate=payload.contingency_rate,
+            items=mapped_items,
+            reconciliation_items=payload.reconciliation_items,
+            vat_status=payload.vat_status,
+        )
+        filename = f"Matara_OT_Consolidated_BOQ_Estimate_{pkg_name}_Selected.xlsx"
+        return Response(
+            content=xlsx_bytes,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Access-Control-Expose-Headers": "Content-Disposition",
+            },
+        )
+    else:
+        var_map = {
+            "pdf_combined": "combined",
+            "pdf_boq": "boq",
+            "pdf_recon": "reconciliation",
+        }
+        variant = var_map.get(payload.format, "combined")
+        pdf_bytes = generate_package_pdf(
+            package_key=payload.package_key,
+            variant=variant,
+            project_title=payload.project_title,
+            source_note=payload.source_note,
+            contingency_rate=payload.contingency_rate,
+            items=mapped_items,
+            reconciliation_items=payload.reconciliation_items,
+            vat_status=payload.vat_status,
+        )
+        filename = f"Matara_OT_Consolidated_{pkg_name}_Selected_{variant.capitalize()}.pdf"
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
                 "Access-Control-Expose-Headers": "Content-Disposition",
             },
         )

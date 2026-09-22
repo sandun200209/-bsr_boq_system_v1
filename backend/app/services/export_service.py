@@ -305,8 +305,8 @@ def generate_package_excel(
     if items is not None and len(items) > 0:
         _populate_boq_items(ws_boq, items, contingency_rate, vat_status, pkg_id)
 
-    # 3. If custom reconciliation rows are supplied, populate reconciliation sheet
-    if reconciliation_items is not None and len(reconciliation_items) > 0:
+    # 3. If approved reconciliation rows are supplied, populate reconciliation sheet
+    if reconciliation_items is not None:
         _populate_recon_items(ws_recon, reconciliation_items, pkg)
 
     # Save to memory buffer
@@ -583,7 +583,7 @@ def generate_package_pdf(
     final_recon_title = base_data["recon_title"]
 
     boq_data = items if items is not None and len(items) > 0 else base_data["boq_items"]
-    recon_data = reconciliation_items if reconciliation_items is not None and len(reconciliation_items) > 0 else base_data["recon_items"]
+    recon_data = reconciliation_items if reconciliation_items is not None else base_data["recon_items"]
 
     buf = io.BytesIO()
     doc = SimpleDocTemplate(

@@ -136,6 +136,7 @@ const MainApp: React.FC = () => {
             <RateSearchPage
               initialFilters={navigationParams}
               onViewSource={(fileId) => handleNavigate('sources', { fileId })}
+              onNavigate={handleNavigate}
             />
           )}
           {activeTab === 'compare' && <CompareRatesPage />}

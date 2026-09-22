@@ -265,3 +265,13 @@ class ExportRequest(BaseModel):
 
 class ExportPdfRequest(ExportRequest):
     variant: str = "combined"  # 'combined', 'boq', or 'reconciliation'
+
+class ExportByIdsRequest(BaseModel):
+    rate_item_ids: list[int]
+    package_key: str = "electrical"
+    project_title: str | None = None
+    source_note: str | None = None
+    contingency_rate: float = 0.10
+    reconciliation_items: list[Any] | None = None
+    vat_status: str = "Excluded"
+    format: str = "excel"  # 'excel', 'pdf_combined', 'pdf_boq', 'pdf_recon'

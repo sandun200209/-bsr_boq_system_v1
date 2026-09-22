@@ -19,11 +19,13 @@ import { SECTORS, RATE_SYSTEMS, SECTOR_BADGE_CLASSES } from '../constants/sriLan
 interface RateSearchPageProps {
   initialFilters?: any;
   onViewSource?: (fileId: number, page?: number) => void;
+  onNavigate?: (tab: string, params?: any) => void;
 }
 
 export const RateSearchPage: React.FC<RateSearchPageProps> = ({
   initialFilters,
   onViewSource,
+  onNavigate,
 }) => {
   // Query & Filters
   const [searchTerm, setSearchTerm] = useState<string>(initialFilters?.q || '');
@@ -507,6 +509,19 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
               >
                 <FileSpreadsheet className="w-3.5 h-3.5" />
                 <span>Copy Selected ({selectedIds.size}) for Excel</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  if (onNavigate) {
+                    onNavigate('export', { selectedIds: Array.from(selectedIds) });
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-semibold shadow-xs transition-colors cursor-pointer"
+                title="Export selected items to Master QS BOQ (.xlsx / PDF)"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Export Master BOQ ({selectedIds.size})</span>
               </button>
 
               <button
