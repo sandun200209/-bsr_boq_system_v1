@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   LayoutDashboard,
+  FolderKanban,
   UploadCloud,
   Search,
   GitCompare,
@@ -41,6 +42,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const baseMenuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'projects', label: 'Project Estimating', icon: FolderKanban },
     { id: 'import', label: 'Import Center', icon: UploadCloud },
     { id: 'search', label: 'Rate Search', icon: Search },
     { id: 'compare', label: 'Compare Rates', icon: GitCompare },

@@ -442,4 +442,78 @@ export const api = {
       options,
       `Matara_OT_Consolidated_${options.package_key}_${options.variant || 'combined'}.pdf`
     ),
+
+  // Project Estimating & Template Export Engine
+  getProjects: () => request<any[]>('/projects'),
+
+  getProject: (id: number) => request<any>(`/projects/${id}`),
+
+  createProject: (data: any) =>
+    request<any>('/projects', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+
+  updateProject: (id: number, data: any) =>
+    request<any>(`/projects/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+
+  addProjectSection: (projectId: number, data: any) =>
+    request<any>(`/projects/${projectId}/sections`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+
+  addProjectItem: (sectionId: number, data: any) =>
+    request<any>(`/projects/sections/${sectionId}/items`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+
+  updateProjectItem: (itemId: number, data: any) =>
+    request<any>(`/projects/items/${itemId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+
+  deleteProjectItem: (itemId: number) =>
+    request<any>(`/projects/items/${itemId}`, { method: 'DELETE' }),
+
+  addDuplicationRecord: (sectionId: number, data: any) =>
+    request<any>(`/projects/sections/${sectionId}/duplication-records`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+
+  addChangeRegisterRecord: (sectionId: number, data: any) =>
+    request<any>(`/projects/sections/${sectionId}/change-register-records`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+
+  getHistoricalRateComparison: (params: { master_item_id?: number; query?: string; base_year?: number }) => {
+    const q = new URLSearchParams();
+    if (params.master_item_id) q.append('master_item_id', String(params.master_item_id));
+    if (params.query) q.append('query', params.query);
+    if (params.base_year) q.append('base_year', String(params.base_year));
+    return request<any>(`/projects/rates/historical-comparison?${q.toString()}`);
+  },
+
+  downloadProjectExcel: (projectId: number, mode: 'consolidated' | 'separate', targetSectionId?: number) =>
+    downloadFile(
+      `/projects/${projectId}/export/excel`,
+      { mode, target_section_id: targetSectionId },
+      `Project_${projectId}_${mode}.xlsx`
+    ),
+
+  getSystemTemplates: () => request<any[]>('/projects/system/templates'),
 };

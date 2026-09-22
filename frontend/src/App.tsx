@@ -14,6 +14,7 @@ import { MasterItemsPage } from './pages/MasterItemsPage';
 import { UserManagementPage } from './pages/UserManagementPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ExportReportPage } from './pages/ExportReportPage';
+import { ProjectsPage } from './pages/ProjectsPage';
 import { api } from './api/client';
 import { HardHat, Loader2 } from 'lucide-react';
 
@@ -126,6 +127,7 @@ const MainApp: React.FC = () => {
           {activeTab === 'dashboard' && (
             <DashboardPage onNavigate={handleNavigate} />
           )}
+          {activeTab === 'projects' && <ProjectsPage />}
           {activeTab === 'import' && (
             <ImportCenterPage
               onNavigate={handleNavigate}
