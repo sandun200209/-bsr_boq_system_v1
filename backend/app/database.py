@@ -4,12 +4,16 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 from .config import settings
 
-# Engine configuration with pooling suitable for multi-client LAN access
+engine_kwargs: dict = {"pool_pre_ping": True}
+if "sqlite" in settings.DATABASE_URL:
+    engine_kwargs["connect_args"] = {"check_same_thread": False}
+else:
+    engine_kwargs["pool_size"] = 15
+    engine_kwargs["max_overflow"] = 25
+
 engine = create_engine(
     settings.DATABASE_URL,
-    pool_pre_ping=True,
-    pool_size=15,
-    max_overflow=25,
+    **engine_kwargs,
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

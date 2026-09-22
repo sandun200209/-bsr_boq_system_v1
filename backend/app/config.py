@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = os.getenv(
         "DATABASE_URL", 
-        "postgresql+psycopg://bsr_user:bsr_password@db:5432/bsr_boq"
+        f"sqlite:///{Path(__file__).resolve().parent.parent.parent / 'data' / 'bsr_boq.db'}"
     )
     
     # Cloud / Local Storage
@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     SUPABASE_SERVICE_ROLE_KEY: str | None = os.getenv("SUPABASE_SERVICE_ROLE_KEY", None)
     SUPABASE_STORAGE_BUCKET: str = os.getenv("SUPABASE_STORAGE_BUCKET", "bsr-documents")
 
-    UPLOAD_DIR: Path = Path(os.getenv("UPLOAD_DIR", "/data/uploads"))
+    UPLOAD_DIR: Path = Path(os.getenv("UPLOAD_DIR", str(Path(__file__).resolve().parent.parent.parent / "data" / "uploads")))
     MAX_UPLOAD_SIZE_BYTES: int = 250 * 1024 * 1024  # 250 MB
     
     # Authentication & Security
