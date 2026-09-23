@@ -115,7 +115,37 @@ def get_filter_options(
     ).all()
     all_sectors = list(dict.fromkeys(list(sectors_db) + settings.SUPPORTED_SECTORS))
 
-    # 2. CESMM Sections (Step 2) - Only sections with mapped items for selected rate_system
+    # 2. Year (Step 2) - Depends on Rate Book
+    year_q = select(RateItem.year).distinct().where(RateItem.year.isnot(None))
+    year_q = _apply_rate_filters(
+        year_q,
+        sector=sector,
+        rate_system=rate_system,
+    )
+    years = db.scalars(year_q.order_by(desc(RateItem.year))).all()
+
+    # 3. Province (Step 3) - Depends on Rate Book + Year
+    prov_q = select(RateItem.province).distinct().where(RateItem.province.isnot(None))
+    prov_q = _apply_rate_filters(
+        prov_q,
+        sector=sector,
+        rate_system=rate_system,
+        year=year,
+    )
+    provinces = db.scalars(prov_q.order_by(RateItem.province)).all()
+
+    # 4. District (Step 4) - Depends on Rate Book + Year + Province
+    dist_q = select(RateItem.district).distinct().where(RateItem.district.isnot(None))
+    dist_q = _apply_rate_filters(
+        dist_q,
+        sector=sector,
+        rate_system=rate_system,
+        year=year,
+        province=province,
+    )
+    districts = db.scalars(dist_q.order_by(RateItem.district)).all()
+
+    # 5. CESMM Sections (Step 5) - Depends on Rate Book + Year + Province + District
     if rate_system and rate_system.strip():
         cesmm_q = (
             select(CESMMSection)
@@ -123,7 +153,14 @@ def get_filter_options(
             .join(RateItem, RateItem.id == RateItemCESMMSection.rate_item_id)
             .where(CESMMSection.is_active == True)
         )
-        cesmm_q = _apply_rate_filters(cesmm_q, rate_system=rate_system, sector=sector)
+        cesmm_q = _apply_rate_filters(
+            cesmm_q,
+            sector=sector,
+            rate_system=rate_system,
+            year=year,
+            province=province,
+            district=district,
+        )
         cesmm_sections_db = db.scalars(cesmm_q.distinct().order_by(CESMMSection.section_no)).all()
     else:
         # Full master list if no rate system selected
@@ -143,68 +180,32 @@ def get_filter_options(
         for s in cesmm_sections_db
     ]
 
-    # 3. Category / Trade (Step 3) - Depends on Rate Book + CESMM Section
+    # 6. Category / Trade (Step 6) - Depends on previous + CESMM Section
     cat_q = select(RateItem.category_name).distinct().where(RateItem.category_name.isnot(None))
     cat_q = _apply_rate_filters(
         cat_q,
         sector=sector,
         rate_system=rate_system,
+        year=year,
+        province=province,
+        district=district,
         cesmm_section_no=cesmm_section_no,
         cesmm_section_id=cesmm_section_id,
     )
     categories = db.scalars(cat_q.order_by(RateItem.category_name)).all()
 
-    # 4. Province (Step 4) - Depends on previous (Rate Book, CESMM, Category)
-    prov_q = select(RateItem.province).distinct().where(RateItem.province.isnot(None))
-    prov_q = _apply_rate_filters(
-        prov_q,
-        sector=sector,
-        rate_system=rate_system,
-        cesmm_section_no=cesmm_section_no,
-        cesmm_section_id=cesmm_section_id,
-        category=category,
-    )
-    provinces = db.scalars(prov_q.order_by(RateItem.province)).all()
-
-    # 5. District (Step 5) - Depends on previous + Province
-    dist_q = select(RateItem.district).distinct().where(RateItem.district.isnot(None))
-    dist_q = _apply_rate_filters(
-        dist_q,
-        sector=sector,
-        rate_system=rate_system,
-        cesmm_section_no=cesmm_section_no,
-        cesmm_section_id=cesmm_section_id,
-        category=category,
-        province=province,
-    )
-    districts = db.scalars(dist_q.order_by(RateItem.district)).all()
-
-    # 6. Year (Step 6) - Depends on previous + District
-    year_q = select(RateItem.year).distinct().where(RateItem.year.isnot(None))
-    year_q = _apply_rate_filters(
-        year_q,
-        sector=sector,
-        rate_system=rate_system,
-        cesmm_section_no=cesmm_section_no,
-        cesmm_section_id=cesmm_section_id,
-        category=category,
-        province=province,
-        district=district,
-    )
-    years = db.scalars(year_q.order_by(desc(RateItem.year))).all()
-
-    # 7. Revision (Step 7) - Depends on previous + Year
+    # 7. Revision (Step 7) - Depends on previous + Category
     rev_q = select(RateItem.revision).distinct().where(RateItem.revision.isnot(None))
     rev_q = _apply_rate_filters(
         rev_q,
         sector=sector,
         rate_system=rate_system,
+        year=year,
+        province=province,
+        district=district,
         cesmm_section_no=cesmm_section_no,
         cesmm_section_id=cesmm_section_id,
         category=category,
-        province=province,
-        district=district,
-        year=year,
     )
     revisions = db.scalars(rev_q.order_by(RateItem.revision)).all()
 
@@ -214,12 +215,12 @@ def get_filter_options(
         vat_q,
         sector=sector,
         rate_system=rate_system,
+        year=year,
+        province=province,
+        district=district,
         cesmm_section_no=cesmm_section_no,
         cesmm_section_id=cesmm_section_id,
         category=category,
-        province=province,
-        district=district,
-        year=year,
         revision=revision,
     )
     vat_bases = db.scalars(vat_q.order_by(RateItem.vat_basis)).all()
@@ -230,12 +231,12 @@ def get_filter_options(
         sheet_q,
         sector=sector,
         rate_system=rate_system,
+        year=year,
+        province=province,
+        district=district,
         cesmm_section_no=cesmm_section_no,
         cesmm_section_id=cesmm_section_id,
         category=category,
-        province=province,
-        district=district,
-        year=year,
         revision=revision,
         vat_basis=vat_basis,
     )
@@ -247,12 +248,12 @@ def get_filter_options(
         status_q,
         sector=sector,
         rate_system=rate_system,
+        year=year,
+        province=province,
+        district=district,
         cesmm_section_no=cesmm_section_no,
         cesmm_section_id=cesmm_section_id,
         category=category,
-        province=province,
-        district=district,
-        year=year,
         revision=revision,
         vat_basis=vat_basis,
         sheet=sheet,
@@ -265,12 +266,12 @@ def get_filter_options(
         page_q,
         sector=sector,
         rate_system=rate_system,
+        year=year,
+        province=province,
+        district=district,
         cesmm_section_no=cesmm_section_no,
         cesmm_section_id=cesmm_section_id,
         category=category,
-        province=province,
-        district=district,
-        year=year,
         revision=revision,
         vat_basis=vat_basis,
         sheet=sheet,
@@ -284,12 +285,12 @@ def get_filter_options(
         count_q,
         sector=sector,
         rate_system=rate_system,
+        year=year,
+        province=province,
+        district=district,
         cesmm_section_no=cesmm_section_no,
         cesmm_section_id=cesmm_section_id,
         category=category,
-        province=province,
-        district=district,
-        year=year,
         revision=revision,
         vat_basis=vat_basis,
         sheet=sheet,

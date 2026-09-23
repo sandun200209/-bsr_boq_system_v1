@@ -288,22 +288,23 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
 
   // Cascading enabled / satisfied states
   const isRateBookSelected = Boolean(rateSystem);
-  const isCesmmEnabled = isRateBookSelected;
-  const isCesmmSelected = Boolean(isCesmmEnabled && cesmmSectionNo);
 
-  const isCategoryEnabled = isCesmmSelected;
-  const isCategorySelected = Boolean(isCategoryEnabled && category);
+  const isYearEnabled = isRateBookSelected;
+  const isYearSelected = Boolean(isYearEnabled && year);
 
-  const isProvinceEnabled = isCategorySelected;
+  const isProvinceEnabled = isYearSelected;
   const isProvinceSelected = Boolean(isProvinceEnabled && province);
 
   const isDistrictEnabled = isProvinceSelected;
   const isDistrictSelected = Boolean(isDistrictEnabled && district);
 
-  const isYearEnabled = isDistrictSelected;
-  const isYearSelected = Boolean(isYearEnabled && year);
+  const isCesmmEnabled = isDistrictSelected;
+  const isCesmmSelected = Boolean(isCesmmEnabled && cesmmSectionNo);
 
-  const isRevisionEnabled = isYearSelected;
+  const isCategoryEnabled = isCesmmSelected;
+  const isCategorySelected = Boolean(isCategoryEnabled && category);
+
+  const isRevisionEnabled = isCategorySelected;
   const isRevisionSelected = Boolean(isRevisionEnabled && revision);
 
   const isVatEnabled = isRevisionSelected;
@@ -319,11 +320,11 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
   // Strict Reset-on-Change handlers: each resets all downstream child filters
   const handleRateSystemChange = (val: string) => {
     setRateSystem(val);
+    setYear('');
+    setProvince('');
+    setDistrict('');
     setCesmmSectionNo('');
     setCategory('');
-    setProvince('');
-    setDistrict('');
-    setYear('');
     setRevision('');
     setVatBasis('');
     setSheet('');
@@ -332,25 +333,12 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
     setPage(1);
   };
 
-  const handleCesmmChange = (val: string) => {
-    setCesmmSectionNo(val);
+  const handleYearChange = (val: string) => {
+    setYear(val);
+    setProvince('');
+    setDistrict('');
+    setCesmmSectionNo('');
     setCategory('');
-    setProvince('');
-    setDistrict('');
-    setYear('');
-    setRevision('');
-    setVatBasis('');
-    setSheet('');
-    setStatus('ALL');
-    setPageNumber('');
-    setPage(1);
-  };
-
-  const handleCategoryChange = (val: string) => {
-    setCategory(val);
-    setProvince('');
-    setDistrict('');
-    setYear('');
     setRevision('');
     setVatBasis('');
     setSheet('');
@@ -362,7 +350,8 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
   const handleProvinceChange = (val: string) => {
     setProvince(val);
     setDistrict('');
-    setYear('');
+    setCesmmSectionNo('');
+    setCategory('');
     setRevision('');
     setVatBasis('');
     setSheet('');
@@ -373,7 +362,8 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
 
   const handleDistrictChange = (val: string) => {
     setDistrict(val);
-    setYear('');
+    setCesmmSectionNo('');
+    setCategory('');
     setRevision('');
     setVatBasis('');
     setSheet('');
@@ -382,8 +372,19 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
     setPage(1);
   };
 
-  const handleYearChange = (val: string) => {
-    setYear(val);
+  const handleCesmmChange = (val: string) => {
+    setCesmmSectionNo(val);
+    setCategory('');
+    setRevision('');
+    setVatBasis('');
+    setSheet('');
+    setStatus('ALL');
+    setPageNumber('');
+    setPage(1);
+  };
+
+  const handleCategoryChange = (val: string) => {
+    setCategory(val);
     setRevision('');
     setVatBasis('');
     setSheet('');
@@ -427,11 +428,11 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
     setDebouncedSearch('');
     setSector('');
     setRateSystem('');
-    setCesmmSectionNo('');
-    setCategory('');
+    setYear('');
     setProvince('');
     setDistrict('');
-    setYear('');
+    setCesmmSectionNo('');
+    setCategory('');
     setRevision('');
     setDatasetType('');
     setVatBasis('');
@@ -498,11 +499,11 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
         <div className="flex items-center gap-1.5 overflow-x-auto text-[11px] py-1 border-y border-slate-100 no-scrollbar">
           {[
             { step: 1, name: 'Rate Book', active: isRateBookSelected },
-            { step: 2, name: 'CESMM-SL', active: isCesmmSelected },
-            { step: 3, name: 'Category', active: isCategorySelected },
-            { step: 4, name: 'Province', active: isProvinceSelected },
-            { step: 5, name: 'District', active: isDistrictSelected },
-            { step: 6, name: 'Year', active: isYearSelected },
+            { step: 2, name: 'Year', active: isYearSelected },
+            { step: 3, name: 'Province', active: isProvinceSelected },
+            { step: 4, name: 'District', active: isDistrictSelected },
+            { step: 5, name: 'CESMM-SL', active: isCesmmSelected },
+            { step: 6, name: 'Category', active: isCategorySelected },
             { step: 7, name: 'Revision', active: isRevisionSelected },
             { step: 8, name: 'VAT', active: isVatSelected },
             { step: 9, name: 'Sheet', active: isSheetSatisfied },
@@ -515,7 +516,7 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
                 className={`px-1.5 py-0.5 rounded font-mono text-[10px] whitespace-nowrap transition-colors ${
                   item.active
                     ? 'bg-blue-600 text-white font-bold shadow-2xs'
-                    : (item.step === 1 || (item.step === 2 && isCesmmEnabled) || (item.step === 3 && isCategoryEnabled) || (item.step === 4 && isProvinceEnabled) || (item.step === 5 && isDistrictEnabled) || (item.step === 6 && isYearEnabled) || (item.step === 7 && isRevisionEnabled) || (item.step === 8 && isVatEnabled) || (item.step === 9 && isSheetEnabled) || (item.step === 10 && isStatusEnabled) || (item.step === 11 && isPageEnabled))
+                    : (item.step === 1 || (item.step === 2 && isYearEnabled) || (item.step === 3 && isProvinceEnabled) || (item.step === 4 && isDistrictEnabled) || (item.step === 5 && isCesmmEnabled) || (item.step === 6 && isCategoryEnabled) || (item.step === 7 && isRevisionEnabled) || (item.step === 8 && isVatEnabled) || (item.step === 9 && isSheetEnabled) || (item.step === 10 && isStatusEnabled) || (item.step === 11 && isPageEnabled))
                     ? 'bg-blue-50 text-blue-700 font-semibold border border-blue-200'
                     : 'bg-slate-100 text-slate-400 select-none'
                 }`}
@@ -540,7 +541,61 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
             ))}
           </select>
 
-          {/* 2: CESMM Section */}
+          {/* 2: Year */}
+          <select
+            value={year}
+            disabled={!isYearEnabled}
+            onChange={(e) => handleYearChange(e.target.value)}
+            className={`text-xs rounded-lg py-1.5 px-2 transition-colors ${
+              isYearEnabled
+                ? 'border border-slate-300 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer font-medium'
+                : 'border border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed select-none'
+            }`}
+            title={year || (isYearEnabled ? 'Step 2: Select Year' : 'Step 2: Disabled (Select Rate Book first)')}
+          >
+            <option value="">{isYearEnabled ? '2. [Select Year]' : '2. Year (Locked)'}</option>
+            {filterOpts?.years?.map((y) => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+
+          {/* 3: Province */}
+          <select
+            value={province}
+            disabled={!isProvinceEnabled}
+            onChange={(e) => handleProvinceChange(e.target.value)}
+            className={`text-xs rounded-lg py-1.5 px-2 transition-colors ${
+              isProvinceEnabled
+                ? 'border border-slate-300 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer font-medium'
+                : 'border border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed select-none'
+            }`}
+            title={province || (isProvinceEnabled ? 'Step 3: Select Province' : 'Step 3: Disabled (Select Year first)')}
+          >
+            <option value="">{isProvinceEnabled ? '3. [Select Province]' : '3. Province (Locked)'}</option>
+            {filterOpts?.provinces?.map((p) => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </select>
+
+          {/* 4: District */}
+          <select
+            value={district}
+            disabled={!isDistrictEnabled}
+            onChange={(e) => handleDistrictChange(e.target.value)}
+            className={`text-xs rounded-lg py-1.5 px-2 transition-colors ${
+              isDistrictEnabled
+                ? 'border border-slate-300 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer font-medium'
+                : 'border border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed select-none'
+            }`}
+            title={district || (isDistrictEnabled ? 'Step 4: Select District' : 'Step 4: Disabled (Select Province first)')}
+          >
+            <option value="">{isDistrictEnabled ? '4. [Select District]' : '4. District (Locked)'}</option>
+            {filterOpts?.districts?.map((d) => (
+              <option key={d} value={d}>{d}</option>
+            ))}
+          </select>
+
+          {/* 5: CESMM Section */}
           <select
             value={cesmmSectionNo}
             disabled={!isCesmmEnabled}
@@ -550,9 +605,9 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
                 ? 'border border-indigo-400 bg-indigo-50/60 text-indigo-950 focus:outline-none focus:ring-2 focus:ring-indigo-600 cursor-pointer font-semibold shadow-2xs'
                 : 'border border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed select-none'
             }`}
-            title={cesmmSectionNo ? `CESMM Section ${cesmmSectionNo}` : (isCesmmEnabled ? 'Step 2: Select CESMM Section' : 'Step 2: Disabled (Select Rate Book first)')}
+            title={cesmmSectionNo ? `CESMM Section ${cesmmSectionNo}` : (isCesmmEnabled ? 'Step 5: Select CESMM Section' : 'Step 5: Disabled (Select District first)')}
           >
-            <option value="">{isCesmmEnabled ? '2. [Select CESMM Section]' : '2. CESMM (Locked)'}</option>
+            <option value="">{isCesmmEnabled ? '5. [Select CESMM Section]' : '5. CESMM (Locked)'}</option>
             {filterOpts?.cesmm_sections?.map((cs) => (
               <option key={cs.id} value={cs.section_no}>
                 {cs.display_label || `${cs.section_no} - ${cs.name} (${cs.section_code})`}
@@ -560,7 +615,7 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
             ))}
           </select>
 
-          {/* 3: Category */}
+          {/* 6: Category */}
           <select
             value={category}
             disabled={!isCategoryEnabled}
@@ -570,65 +625,11 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
                 ? 'border border-slate-300 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer font-medium'
                 : 'border border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed select-none'
             }`}
-            title={category || (isCategoryEnabled ? 'Step 3: Select Category' : 'Step 3: Disabled (Select CESMM Section first)')}
+            title={category || (isCategoryEnabled ? 'Step 6: Select Category' : 'Step 6: Disabled (Select CESMM Section first)')}
           >
-            <option value="">{isCategoryEnabled ? '3. [Select Category]' : '3. Category (Locked)'}</option>
+            <option value="">{isCategoryEnabled ? '6. [Select Category]' : '6. Category (Locked)'}</option>
             {filterOpts?.categories?.map((c) => (
               <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
-
-          {/* 4: Province */}
-          <select
-            value={province}
-            disabled={!isProvinceEnabled}
-            onChange={(e) => handleProvinceChange(e.target.value)}
-            className={`text-xs rounded-lg py-1.5 px-2 transition-colors ${
-              isProvinceEnabled
-                ? 'border border-slate-300 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer'
-                : 'border border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed select-none'
-            }`}
-            title={province || (isProvinceEnabled ? 'Step 4: Select Province' : 'Step 4: Disabled (Select Category first)')}
-          >
-            <option value="">{isProvinceEnabled ? '4. [Select Province]' : '4. Province (Locked)'}</option>
-            {filterOpts?.provinces?.map((p) => (
-              <option key={p} value={p}>{p}</option>
-            ))}
-          </select>
-
-          {/* 5: District */}
-          <select
-            value={district}
-            disabled={!isDistrictEnabled}
-            onChange={(e) => handleDistrictChange(e.target.value)}
-            className={`text-xs rounded-lg py-1.5 px-2 transition-colors ${
-              isDistrictEnabled
-                ? 'border border-slate-300 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer'
-                : 'border border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed select-none'
-            }`}
-            title={district || (isDistrictEnabled ? 'Step 5: Select District' : 'Step 5: Disabled (Select Province first)')}
-          >
-            <option value="">{isDistrictEnabled ? '5. [Select District]' : '5. District (Locked)'}</option>
-            {filterOpts?.districts?.map((d) => (
-              <option key={d} value={d}>{d}</option>
-            ))}
-          </select>
-
-          {/* 6: Year */}
-          <select
-            value={year}
-            disabled={!isYearEnabled}
-            onChange={(e) => handleYearChange(e.target.value)}
-            className={`text-xs rounded-lg py-1.5 px-2 transition-colors ${
-              isYearEnabled
-                ? 'border border-slate-300 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer'
-                : 'border border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed select-none'
-            }`}
-            title={year || (isYearEnabled ? 'Step 6: Select Year' : 'Step 6: Disabled (Select District first)')}
-          >
-            <option value="">{isYearEnabled ? '6. [Select Year]' : '6. Year (Locked)'}</option>
-            {filterOpts?.years?.map((y) => (
-              <option key={y} value={y}>{y}</option>
             ))}
           </select>
 
@@ -642,7 +643,7 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
                 ? 'border border-slate-300 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer'
                 : 'border border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed select-none'
             }`}
-            title={revision || (isRevisionEnabled ? 'Step 7: Select Revision' : 'Step 7: Disabled (Select Year first)')}
+            title={revision || (isRevisionEnabled ? 'Step 7: Select Revision' : 'Step 7: Disabled (Select Category first)')}
           >
             <option value="">{isRevisionEnabled ? '7. [Select Revision]' : '7. Revision (Locked)'}</option>
             {filterOpts?.revisions?.map((r) => (

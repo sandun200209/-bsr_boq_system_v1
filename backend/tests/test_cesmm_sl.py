@@ -293,9 +293,14 @@ class TestCESMMSLClassification:
         """
         Strict Cascading Filter Flow Rule:
         1. Rate Book first.
-        2. CESMM section only shows sections mapped to that rate book.
-        3. Category only shows categories matching both Rate Book and CESMM Section.
-        4. Subsequent filters cascade with non-empty matching records.
+        2. Year depends on Rate Book.
+        3. Province depends on Year.
+        4. District depends on Province.
+        5. CESMM section depends on District + prior selections.
+        6. Category depends on CESMM Section + prior selections.
+        7. Revision depends on Category.
+        8. VAT basis depends on Revision.
+        9. Status and matching records cascade cleanly.
         """
         # Step 1: Base options
         res_base = client.get("/api/rates/filters")
@@ -304,57 +309,87 @@ class TestCESMMSLClassification:
         assert "BSR" in data_base["rate_systems"]
         assert "HSR" in data_base["rate_systems"]
 
-        # Step 2: Rate Book = HSR
-        res_hsr = client.get("/api/rates/filters", params={"rate_system": "HSR"})
-        assert res_hsr.status_code == 200
-        hsr_sec_nos = [s["section_no"] for s in res_hsr.json()["cesmm_sections"]]
-        assert "05" in hsr_sec_nos  # Earth works is mapped
-        assert "01" not in hsr_sec_nos  # Unmapped sections are not shown for HSR
-
-        # Step 2: Rate Book = BSR
+        # Step 2: Rate Book = BSR -> Years
         res_bsr = client.get("/api/rates/filters", params={"rate_system": "BSR"})
         assert res_bsr.status_code == 200
-        bsr_sec_nos = [s["section_no"] for s in res_bsr.json()["cesmm_sections"]]
-        assert "04" in bsr_sec_nos  # Demolition is mapped
-        assert "08" in bsr_sec_nos  # Concrete is mapped
+        assert 2023 in res_bsr.json()["years"]
 
-        # Step 3: BSR + Section 04 (Demolition)
-        res_bsr_04 = client.get(
+        # Step 3: BSR + Year 2023 -> Provinces
+        res_prov = client.get("/api/rates/filters", params={"rate_system": "BSR", "year": 2023})
+        assert res_prov.status_code == 200
+        assert "All Provinces" in res_prov.json()["provinces"]
+
+        # Step 4: + Province 'All Provinces' -> Districts
+        res_dist = client.get(
             "/api/rates/filters",
-            params={"rate_system": "BSR", "cesmm_section_no": "04"},
+            params={"rate_system": "BSR", "year": 2023, "province": "All Provinces"},
         )
-        assert res_bsr_04.status_code == 200
-        bsr_04_cats = res_bsr_04.json()["categories"]
-        assert len(bsr_04_cats) > 0
-        for c in bsr_04_cats:
-            assert "demolish" in c.lower(), f"Unexpected category under demolition: {c}"
+        assert res_dist.status_code == 200
+        assert "National / All Island" in res_dist.json()["districts"]
 
-        # Step 4 & 5: Province and District cascade
-        demolish_cat = bsr_04_cats[0]
-        res_bsr_prov = client.get(
-            "/api/rates/filters",
-            params={"rate_system": "BSR", "cesmm_section_no": "04", "category": demolish_cat},
-        )
-        assert res_bsr_prov.status_code == 200
-        provs = res_bsr_prov.json()["provinces"]
-        assert len(provs) > 0
-
-        # Step 5: With Province selected
-        res_bsr_dist = client.get(
+        # Step 5: + District 'National / All Island' -> CESMM Sections
+        res_cesmm = client.get(
             "/api/rates/filters",
             params={
                 "rate_system": "BSR",
-                "cesmm_section_no": "04",
-                "category": demolish_cat,
-                "province": provs[0],
+                "year": 2023,
+                "province": "All Provinces",
+                "district": "National / All Island",
             },
         )
-        assert res_bsr_dist.status_code == 200
-        assert len(res_bsr_dist.json()["districts"]) > 0
-        assert res_bsr_dist.json()["total_matching"] > 0
+        assert res_cesmm.status_code == 200
+        sec_nos = [s["section_no"] for s in res_cesmm.json()["cesmm_sections"]]
+        assert "05" in sec_nos  # Earth works
+
+        # Step 6: + CESMM Section '05' -> Categories
+        res_cat = client.get(
+            "/api/rates/filters",
+            params={
+                "rate_system": "BSR",
+                "year": 2023,
+                "province": "All Provinces",
+                "district": "National / All Island",
+                "cesmm_section_no": "05",
+            },
+        )
+        assert res_cat.status_code == 200
+        cats = res_cat.json()["categories"]
+        assert "B-EXCAVATOR" in cats
+
+        # Step 7: + Category 'B-EXCAVATOR' -> Revisions
+        res_rev = client.get(
+            "/api/rates/filters",
+            params={
+                "rate_system": "BSR",
+                "year": 2023,
+                "province": "All Provinces",
+                "district": "National / All Island",
+                "cesmm_section_no": "05",
+                "category": "B-EXCAVATOR",
+            },
+        )
+        assert res_rev.status_code == 200
+        assert "Original" in res_rev.json()["revisions"]
+
+        # Step 8: + Revision 'Original' -> VAT basis & Total matching
+        res_vat = client.get(
+            "/api/rates/filters",
+            params={
+                "rate_system": "BSR",
+                "year": 2023,
+                "province": "All Provinces",
+                "district": "National / All Island",
+                "cesmm_section_no": "05",
+                "category": "B-EXCAVATOR",
+                "revision": "Original",
+            },
+        )
+        assert res_vat.status_code == 200
+        assert "Not Applicable" in res_vat.json()["vat_bases"]
+        assert res_vat.json()["total_matching"] == 15
 
         # Test alias route /filter-options
-        res_alias = client.get("/api/rates/filter-options", params={"rate_system": "HSR"})
+        res_alias = client.get("/api/rates/filter-options", params={"rate_system": "BSR"})
         assert res_alias.status_code == 200
-        assert [s["section_no"] for s in res_alias.json()["cesmm_sections"]] == hsr_sec_nos
+        assert res_alias.json()["years"] == res_bsr.json()["years"]
 
