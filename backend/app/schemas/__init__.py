@@ -154,6 +154,9 @@ class FilterOptionsResponse(BaseModel):
     cesmm_sections: list[CESMMSectionOut] = []
     sector_systems: dict[str, list[str]] = {}
     category_presets: dict[str, list[str]] = {}
+    statuses: list[str] = []
+    source_pages: list[int] = []
+    total_matching: int = 0
 
 # ----------------- Review Queue -----------------
 class ReviewBulkActionRequest(BaseModel):

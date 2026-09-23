@@ -12,44 +12,124 @@ from ..services.cesmm_service import get_all_cesmm_sections, seed_cesmm_sections
 
 router = APIRouter(prefix="/rates", tags=["Rates"])
 
+def _apply_rate_filters(
+    query,
+    sector: str | None = None,
+    rate_system: str | None = None,
+    cesmm_section_no: str | None = None,
+    cesmm_section_id: int | None = None,
+    category: str | None = None,
+    province: str | None = None,
+    district: str | None = None,
+    year: int | None = None,
+    revision: str | None = None,
+    dataset_type: str | None = None,
+    vat_basis: str | None = None,
+    sheet: str | None = None,
+    status: str | None = None,
+    source_page: int | None = None,
+):
+    """Context-aware filter helper applying exact cascading constraints."""
+    if sector and sector.strip():
+        query = query.where(RateItem.sector == sector.strip())
+    if rate_system and rate_system.strip():
+        rs_clean = rate_system.strip()
+        if rs_clean.lower() in ("water", "water supply", "water supply rates"):
+            query = query.where(RateItem.rate_system.ilike("%water%"))
+        elif rs_clean.lower() == "bsr":
+            query = query.where(RateItem.rate_system == "BSR")
+        elif rs_clean.lower() == "hsr":
+            query = query.where(RateItem.rate_system == "HSR")
+        else:
+            query = query.where(RateItem.rate_system == rs_clean)
+    if cesmm_section_id is not None:
+        query = query.where(
+            RateItem.cesmm_mappings.any(
+                RateItemCESMMSection.cesmm_section_id == cesmm_section_id
+            )
+        )
+    elif cesmm_section_no and cesmm_section_no.strip():
+        clean_sec_no = cesmm_section_no.strip().zfill(2)
+        query = query.where(
+            RateItem.cesmm_mappings.any(
+                RateItemCESMMSection.cesmm_section.has(
+                    CESMMSection.section_no == clean_sec_no
+                )
+            )
+        )
+    if category and category.strip():
+        cat = category.strip()
+        query = query.where(
+            or_(
+                RateItem.category_name == cat,
+                RateItem.category_code == cat,
+            )
+        )
+    if province and province.strip():
+        query = query.where(RateItem.province == province.strip())
+    if district and district.strip():
+        query = query.where(RateItem.district == district.strip())
+    if year is not None:
+        query = query.where(RateItem.year == year)
+    if revision and revision.strip():
+        query = query.where(RateItem.revision == revision.strip())
+    if dataset_type and dataset_type.strip():
+        query = query.where(RateItem.dataset_type == dataset_type.strip())
+    if vat_basis and vat_basis.strip():
+        query = query.where(RateItem.vat_basis == vat_basis.strip())
+    if sheet and sheet.strip():
+        query = query.where(RateItem.source_sheet == sheet.strip())
+    if status and status.strip() and status.upper() != "ALL":
+        query = query.where(RateItem.validation_status == status.strip().upper())
+    if source_page is not None:
+        query = query.where(RateItem.source_page == source_page)
+    return query
+
 @router.get("/filters", response_model=FilterOptionsResponse)
-def get_filter_options(db: Session = Depends(get_db)):
-    """Returns available distinct filter values across all stored rate items."""
-    sectors_db = db.scalars(
-        select(RateItem.sector).distinct().where(RateItem.sector.isnot(None)).order_by(RateItem.sector)
-    ).all()
+@router.get("/filter-options", response_model=FilterOptionsResponse)
+def get_filter_options(
+    sector: str | None = Query(None),
+    rate_system: str | None = Query(None),
+    cesmm_section_no: str | None = Query(None),
+    cesmm_section_id: int | None = Query(None),
+    category: str | None = Query(None),
+    province: str | None = Query(None),
+    district: str | None = Query(None),
+    year: int | None = Query(None),
+    revision: str | None = Query(None),
+    dataset_type: str | None = Query(None),
+    vat_basis: str | None = Query(None),
+    sheet: str | None = Query(None),
+    status: str | None = Query(None),
+    db: Session = Depends(get_db),
+):
+    """Returns available distinct filter values across stored rate items, dynamically cascading."""
+    # 1. Rate systems (Step 1) - Always all available rate books
     rate_systems_db = db.scalars(
         select(RateItem.rate_system).distinct().where(RateItem.rate_system.isnot(None)).order_by(RateItem.rate_system)
     ).all()
-    provinces = db.scalars(
-        select(RateItem.province).distinct().where(RateItem.province.isnot(None)).order_by(RateItem.province)
-    ).all()
-    districts = db.scalars(
-        select(RateItem.district).distinct().where(RateItem.district.isnot(None)).order_by(RateItem.district)
-    ).all()
-    years = db.scalars(
-        select(RateItem.year).distinct().where(RateItem.year.isnot(None)).order_by(desc(RateItem.year))
-    ).all()
-    revisions = db.scalars(
-        select(RateItem.revision).distinct().where(RateItem.revision.isnot(None)).order_by(RateItem.revision)
-    ).all()
-    dataset_types = db.scalars(
-        select(RateItem.dataset_type).distinct().where(RateItem.dataset_type.isnot(None)).order_by(RateItem.dataset_type)
-    ).all()
-    vat_bases = db.scalars(
-        select(RateItem.vat_basis).distinct().where(RateItem.vat_basis.isnot(None)).order_by(RateItem.vat_basis)
-    ).all()
-    categories = db.scalars(
-        select(RateItem.category_name).distinct().where(RateItem.category_name.isnot(None)).order_by(RateItem.category_name)
-    ).all()
-    sheets = db.scalars(
-        select(RateItem.source_sheet).distinct().where(RateItem.source_sheet.isnot(None)).order_by(RateItem.source_sheet)
-    ).all()
+    all_systems = list(dict.fromkeys(list(rate_systems_db) + settings.SUPPORTED_RATE_SYSTEMS))
 
-    # Fetch 31 standard CESMM sections
-    cesmm_sections_db = get_all_cesmm_sections(db, active_only=True)
-    if not cesmm_sections_db:
-        cesmm_sections_db = seed_cesmm_sections(db)
+    sectors_db = db.scalars(
+        select(RateItem.sector).distinct().where(RateItem.sector.isnot(None)).order_by(RateItem.sector)
+    ).all()
+    all_sectors = list(dict.fromkeys(list(sectors_db) + settings.SUPPORTED_SECTORS))
+
+    # 2. CESMM Sections (Step 2) - Only sections with mapped items for selected rate_system
+    if rate_system and rate_system.strip():
+        cesmm_q = (
+            select(CESMMSection)
+            .join(RateItemCESMMSection, RateItemCESMMSection.cesmm_section_id == CESMMSection.id)
+            .join(RateItem, RateItem.id == RateItemCESMMSection.rate_item_id)
+            .where(CESMMSection.is_active == True)
+        )
+        cesmm_q = _apply_rate_filters(cesmm_q, rate_system=rate_system, sector=sector)
+        cesmm_sections_db = db.scalars(cesmm_q.distinct().order_by(CESMMSection.section_no)).all()
+    else:
+        # Full master list if no rate system selected
+        cesmm_sections_db = get_all_cesmm_sections(db, active_only=True)
+        if not cesmm_sections_db:
+            cesmm_sections_db = seed_cesmm_sections(db)
 
     cesmm_out = [
         CESMMSectionOut(
@@ -63,9 +143,163 @@ def get_filter_options(db: Session = Depends(get_db)):
         for s in cesmm_sections_db
     ]
 
-    # Merge with supported defaults so user can select empty sectors too
-    all_sectors = list(dict.fromkeys(list(sectors_db) + settings.SUPPORTED_SECTORS))
-    all_systems = list(dict.fromkeys(list(rate_systems_db) + settings.SUPPORTED_RATE_SYSTEMS))
+    # 3. Category / Trade (Step 3) - Depends on Rate Book + CESMM Section
+    cat_q = select(RateItem.category_name).distinct().where(RateItem.category_name.isnot(None))
+    cat_q = _apply_rate_filters(
+        cat_q,
+        sector=sector,
+        rate_system=rate_system,
+        cesmm_section_no=cesmm_section_no,
+        cesmm_section_id=cesmm_section_id,
+    )
+    categories = db.scalars(cat_q.order_by(RateItem.category_name)).all()
+
+    # 4. Province (Step 4) - Depends on previous (Rate Book, CESMM, Category)
+    prov_q = select(RateItem.province).distinct().where(RateItem.province.isnot(None))
+    prov_q = _apply_rate_filters(
+        prov_q,
+        sector=sector,
+        rate_system=rate_system,
+        cesmm_section_no=cesmm_section_no,
+        cesmm_section_id=cesmm_section_id,
+        category=category,
+    )
+    provinces = db.scalars(prov_q.order_by(RateItem.province)).all()
+
+    # 5. District (Step 5) - Depends on previous + Province
+    dist_q = select(RateItem.district).distinct().where(RateItem.district.isnot(None))
+    dist_q = _apply_rate_filters(
+        dist_q,
+        sector=sector,
+        rate_system=rate_system,
+        cesmm_section_no=cesmm_section_no,
+        cesmm_section_id=cesmm_section_id,
+        category=category,
+        province=province,
+    )
+    districts = db.scalars(dist_q.order_by(RateItem.district)).all()
+
+    # 6. Year (Step 6) - Depends on previous + District
+    year_q = select(RateItem.year).distinct().where(RateItem.year.isnot(None))
+    year_q = _apply_rate_filters(
+        year_q,
+        sector=sector,
+        rate_system=rate_system,
+        cesmm_section_no=cesmm_section_no,
+        cesmm_section_id=cesmm_section_id,
+        category=category,
+        province=province,
+        district=district,
+    )
+    years = db.scalars(year_q.order_by(desc(RateItem.year))).all()
+
+    # 7. Revision (Step 7) - Depends on previous + Year
+    rev_q = select(RateItem.revision).distinct().where(RateItem.revision.isnot(None))
+    rev_q = _apply_rate_filters(
+        rev_q,
+        sector=sector,
+        rate_system=rate_system,
+        cesmm_section_no=cesmm_section_no,
+        cesmm_section_id=cesmm_section_id,
+        category=category,
+        province=province,
+        district=district,
+        year=year,
+    )
+    revisions = db.scalars(rev_q.order_by(RateItem.revision)).all()
+
+    # 8. VAT (Step 8) - Depends on previous + Revision
+    vat_q = select(RateItem.vat_basis).distinct().where(RateItem.vat_basis.isnot(None))
+    vat_q = _apply_rate_filters(
+        vat_q,
+        sector=sector,
+        rate_system=rate_system,
+        cesmm_section_no=cesmm_section_no,
+        cesmm_section_id=cesmm_section_id,
+        category=category,
+        province=province,
+        district=district,
+        year=year,
+        revision=revision,
+    )
+    vat_bases = db.scalars(vat_q.order_by(RateItem.vat_basis)).all()
+
+    # 9. Sheet (Step 9) - Depends on previous + VAT
+    sheet_q = select(RateItem.source_sheet).distinct().where(RateItem.source_sheet.isnot(None))
+    sheet_q = _apply_rate_filters(
+        sheet_q,
+        sector=sector,
+        rate_system=rate_system,
+        cesmm_section_no=cesmm_section_no,
+        cesmm_section_id=cesmm_section_id,
+        category=category,
+        province=province,
+        district=district,
+        year=year,
+        revision=revision,
+        vat_basis=vat_basis,
+    )
+    sheets = db.scalars(sheet_q.order_by(RateItem.source_sheet)).all()
+
+    # 10. Status (Step 10) - Depends on previous + Sheet
+    status_q = select(RateItem.validation_status).distinct().where(RateItem.validation_status.isnot(None))
+    status_q = _apply_rate_filters(
+        status_q,
+        sector=sector,
+        rate_system=rate_system,
+        cesmm_section_no=cesmm_section_no,
+        cesmm_section_id=cesmm_section_id,
+        category=category,
+        province=province,
+        district=district,
+        year=year,
+        revision=revision,
+        vat_basis=vat_basis,
+        sheet=sheet,
+    )
+    statuses = db.scalars(status_q.order_by(RateItem.validation_status)).all()
+
+    # 11. Source Pages (Step 11) - Distinct source pages available
+    page_q = select(RateItem.source_page).distinct().where(RateItem.source_page.isnot(None))
+    page_q = _apply_rate_filters(
+        page_q,
+        sector=sector,
+        rate_system=rate_system,
+        cesmm_section_no=cesmm_section_no,
+        cesmm_section_id=cesmm_section_id,
+        category=category,
+        province=province,
+        district=district,
+        year=year,
+        revision=revision,
+        vat_basis=vat_basis,
+        sheet=sheet,
+        status=status,
+    )
+    source_pages = db.scalars(page_q.order_by(RateItem.source_page)).all()
+
+    # Total matching records with current filter combination
+    count_q = select(func.count(RateItem.id))
+    count_q = _apply_rate_filters(
+        count_q,
+        sector=sector,
+        rate_system=rate_system,
+        cesmm_section_no=cesmm_section_no,
+        cesmm_section_id=cesmm_section_id,
+        category=category,
+        province=province,
+        district=district,
+        year=year,
+        revision=revision,
+        vat_basis=vat_basis,
+        sheet=sheet,
+        status=status,
+    )
+    total_matching = db.scalar(count_q) or 0
+
+    dataset_types = db.scalars(
+        select(RateItem.dataset_type).distinct().where(RateItem.dataset_type.isnot(None)).order_by(RateItem.dataset_type)
+    ).all()
 
     return FilterOptionsResponse(
         sectors=all_sectors,
@@ -81,6 +315,9 @@ def get_filter_options(db: Session = Depends(get_db)):
         cesmm_sections=cesmm_out,
         sector_systems=settings.SECTOR_RATE_SYSTEM_MAP,
         category_presets=settings.SECTOR_CATEGORY_PRESETS,
+        statuses=list(statuses),
+        source_pages=list(source_pages),
+        total_matching=total_matching,
     )
 
 @router.get("/search", response_model=RateItemSearchResponse)
@@ -108,59 +345,24 @@ def search_rates(
 ):
     query = select(RateItem).join(SourceFile, RateItem.source_file_id == SourceFile.id)
 
-    # Filtering
-    if sector:
-        query = query.where(RateItem.sector == sector)
-    if rate_system and rate_system.strip():
-        rs_clean = rate_system.strip()
-        if rs_clean.lower() in ("water", "water supply", "water supply rates"):
-            query = query.where(RateItem.rate_system.ilike("%water%"))
-        elif rs_clean.lower() == "bsr":
-            query = query.where(RateItem.rate_system == "BSR")
-        elif rs_clean.lower() == "hsr":
-            query = query.where(RateItem.rate_system == "HSR")
-        else:
-            query = query.where(RateItem.rate_system == rs_clean)
-    if cesmm_section_id is not None:
-        query = query.where(
-            RateItem.cesmm_mappings.any(
-                RateItemCESMMSection.cesmm_section_id == cesmm_section_id
-            )
-        )
-    elif cesmm_section_no and cesmm_section_no.strip():
-        clean_sec_no = cesmm_section_no.strip().zfill(2)
-        query = query.where(
-            RateItem.cesmm_mappings.any(
-                RateItemCESMMSection.cesmm_section.has(
-                    CESMMSection.section_no == clean_sec_no
-                )
-            )
-        )
-    if province:
-        query = query.where(RateItem.province == province)
-    if district:
-        query = query.where(RateItem.district == district)
-    if year:
-        query = query.where(RateItem.year == year)
-    if revision:
-        query = query.where(RateItem.revision == revision)
-    if dataset_type:
-        query = query.where(RateItem.dataset_type == dataset_type)
-    if vat_basis:
-        query = query.where(RateItem.vat_basis == vat_basis)
-    if category:
-        query = query.where(
-            or_(
-                RateItem.category_name == category,
-                RateItem.category_code == category,
-            )
-        )
-    if status and status.upper() != "ALL":
-        query = query.where(RateItem.validation_status == status.upper())
-    if source_page:
-        query = query.where(RateItem.source_page == source_page)
-    if sheet:
-        query = query.where(RateItem.source_sheet == sheet)
+    # Filtering via centralized cascading helper
+    query = _apply_rate_filters(
+        query,
+        sector=sector,
+        rate_system=rate_system,
+        cesmm_section_no=cesmm_section_no,
+        cesmm_section_id=cesmm_section_id,
+        category=category,
+        province=province,
+        district=district,
+        year=year,
+        revision=revision,
+        dataset_type=dataset_type,
+        vat_basis=vat_basis,
+        sheet=sheet,
+        status=status,
+        source_page=source_page,
+    )
 
     # Text & Trigram search
     if q and q.strip():

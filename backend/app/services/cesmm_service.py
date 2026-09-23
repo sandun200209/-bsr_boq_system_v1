@@ -1,7 +1,7 @@
 from __future__ import annotations
 import logging
 from datetime import datetime
-from sqlalchemy import select, delete, and_
+from sqlalchemy import select, delete, and_, or_
 from sqlalchemy.orm import Session, selectinload, joinedload
 
 from ..models import CESMMSection, RateItemCESMMSection, RateItem
@@ -82,101 +82,204 @@ def seed_cesmm_sections(db: Session) -> list[CESMMSection]:
 def seed_baseline_cesmm_mappings(db: Session, sections_by_no: dict[str, CESMMSection]):
     """
     Ensures key benchmark records in BSR, HSR, and Water Supply have appropriate
-    CESMM mappings for Scenario A (04), Scenario B (05), Scenario C (12), Scenario 3 (08).
+    CESMM mappings for realistic testing and demonstration.
+    Idempotent: skips any mapping that already exists.
     """
-    sec_04 = sections_by_no.get("04")  # Demolition and site clearance
-    sec_05 = sections_by_no.get("05")  # Earth works
-    sec_08 = sections_by_no.get("08")  # Concrete work - Insitu concrete
-    sec_12 = sections_by_no.get("12")  # Pipe work - Pipes
-    sec_26 = sections_by_no.get("26")  # Brickwork, block work and masonry
+    def _map_items(items, sec, is_primary=True):
+        if not sec:
+            return
+        for item in items:
+            exists = db.scalar(
+                select(RateItemCESMMSection.id).where(
+                    RateItemCESMMSection.rate_item_id == item.id,
+                    RateItemCESMMSection.cesmm_section_id == sec.id,
+                )
+            )
+            if not exists:
+                db.add(RateItemCESMMSection(rate_item_id=item.id, cesmm_section_id=sec.id, is_primary=is_primary))
 
-    if not sec_04 or not sec_05:
-        return
-
-    # Check if mappings already exist
-    existing_count = db.scalar(select(RateItemCESMMSection.id).limit(1))
-    if existing_count:
-        return  # Already seeded or customized by user
-
-    # 1. BSR Demolisher items -> CESMM 04 (Demolition and site clearance)
+    # 1. BSR Demolisher -> CESMM 04 (Demolition and site clearance)
+    sec_04 = sections_by_no.get("04")
     if sec_04:
-        bsr_demo_items = db.scalars(
-            select(RateItem)
-            .where(
-                RateItem.rate_system == "BSR",
-                RateItem.category_name.ilike("%demolish%"),
-            )
-            .limit(20)
+        bsr_demo = db.scalars(
+            select(RateItem).where(RateItem.rate_system == "BSR", RateItem.category_name.ilike("%demolish%")).limit(20)
         ).all()
-        for item in bsr_demo_items:
-            db.add(RateItemCESMMSection(rate_item_id=item.id, cesmm_section_id=sec_04.id, is_primary=True))
+        _map_items(bsr_demo, sec_04)
 
-    # 2. BSR Excavator & Earthwork items -> CESMM 05 (Earth works)
+    # 2. Earth works -> CESMM 05
+    sec_05 = sections_by_no.get("05")
     if sec_05:
-        bsr_excav_items = db.scalars(
-            select(RateItem)
-            .where(
-                RateItem.rate_system == "BSR",
-                RateItem.category_name.ilike("%excavat%"),
-            )
-            .limit(20)
+        bsr_excav = db.scalars(
+            select(RateItem).where(RateItem.rate_system == "BSR", RateItem.category_name.ilike("%excavat%")).limit(20)
         ).all()
-        for item in bsr_excav_items:
-            db.add(RateItemCESMMSection(rate_item_id=item.id, cesmm_section_id=sec_05.id, is_primary=True))
-
-    # 3. HSR Earthwork items -> CESMM 05 (Earth works)
-    if sec_05:
-        hsr_items = db.scalars(
-            select(RateItem)
-            .where(
-                RateItem.rate_system == "HSR",
-                RateItem.item_code.in_(["H-EW01", "H-EW02"]),
-            )
+        _map_items(bsr_excav, sec_05)
+        hsr_ew = db.scalars(
+            select(RateItem).where(RateItem.rate_system == "HSR", RateItem.item_code.in_(["H-EW01", "H-EW02"]))
         ).all()
-        for item in hsr_items:
-            db.add(RateItemCESMMSection(rate_item_id=item.id, cesmm_section_id=sec_05.id, is_primary=True))
+        _map_items(hsr_ew, sec_05)
 
-    # 4. BSR Concreter items -> CESMM 08 (Concrete work - Insitu concrete)
+    # 3. Concrete work - Insitu concrete -> CESMM 08
+    sec_08 = sections_by_no.get("08")
     if sec_08:
-        bsr_concrete_items = db.scalars(
-            select(RateItem)
-            .where(
+        bsr_conc = db.scalars(
+            select(RateItem).where(
                 RateItem.rate_system == "BSR",
-                RateItem.category_name.ilike("%concreter%"),
-            )
-            .limit(20)
+                RateItem.category_name.ilike("%concrete%"),
+                ~RateItem.category_name.ilike("%form%"),
+            ).limit(20)
         ).all()
-        for item in bsr_concrete_items:
-            db.add(RateItemCESMMSection(rate_item_id=item.id, cesmm_section_id=sec_08.id, is_primary=True))
+        _map_items(bsr_conc, sec_08)
 
-    # 5. Water Supply pipe items -> CESMM 12 (Pipe work - Pipes)
+    # 4. Concrete work - Form work -> CESMM 09
+    sec_09 = sections_by_no.get("09")
+    if sec_09:
+        bsr_form = db.scalars(
+            select(RateItem).where(RateItem.rate_system == "BSR", RateItem.category_name.ilike("%form%")).limit(15)
+        ).all()
+        _map_items(bsr_form, sec_09)
+
+    # 5. Concrete work - Reinforcement -> CESMM 10
+    sec_10 = sections_by_no.get("10")
+    if sec_10:
+        bsr_reinf = db.scalars(
+            select(RateItem).where(
+                RateItem.rate_system == "BSR",
+                or_(RateItem.category_name.ilike("%reinforce%"), RateItem.description.ilike("%tor steel%"))
+            ).limit(15)
+        ).all()
+        _map_items(bsr_reinf, sec_10)
+
+    # 6. Precast concrete -> CESMM 11
+    sec_11 = sections_by_no.get("11")
+    if sec_11:
+        precast = db.scalars(
+            select(RateItem).where(RateItem.item_code.in_(["D-UD01", "D-BC01", "H-DR01"]))
+        ).all()
+        _map_items(precast, sec_11)
+
+    # 7. Pipe work - Pipes -> CESMM 12
+    sec_12 = sections_by_no.get("12")
     if sec_12:
-        water_pipe_items = db.scalars(
-            select(RateItem)
-            .where(
+        water_pipes = db.scalars(
+            select(RateItem).where(
                 RateItem.rate_system.ilike("%water%"),
                 RateItem.description.ilike("%pipe%"),
             )
-            .limit(10)
         ).all()
-        for item in water_pipe_items:
-            db.add(RateItemCESMMSection(rate_item_id=item.id, cesmm_section_id=sec_12.id, is_primary=True))
+        _map_items(water_pipes, sec_12)
+        sewer_pipes = db.scalars(
+            select(RateItem).where(RateItem.item_code == "S-GW01")
+        ).all()
+        _map_items(sewer_pipes, sec_12)
+        bsr_pipes = db.scalars(
+            select(RateItem).where(RateItem.rate_system == "BSR", RateItem.category_name.ilike("%pipes%")).limit(10)
+        ).all()
+        _map_items(bsr_pipes, sec_12)
 
-    # 6. BSR Brickwork items -> CESMM 26 (Brickwork, block work and masonry)
-    if sec_26:
-        bsr_brick_items = db.scalars(
-            select(RateItem)
-            .where(
-                RateItem.rate_system == "BSR",
-                RateItem.category_name.ilike("%brick%"),
-            )
-            .limit(20)
+    # 8. Pipe work - Fittings -> CESMM 13
+    sec_13 = sections_by_no.get("13")
+    if sec_13:
+        water_fittings = db.scalars(
+            select(RateItem).where(RateItem.item_code == "W-HY01")
         ).all()
-        for item in bsr_brick_items:
-            db.add(RateItemCESMMSection(rate_item_id=item.id, cesmm_section_id=sec_26.id, is_primary=True))
+        _map_items(water_fittings, sec_13)
+        bsr_fittings = db.scalars(
+            select(RateItem).where(
+                RateItem.rate_system == "BSR",
+                or_(RateItem.category_name.ilike("%elbow%"), RateItem.category_name.ilike("%socket%"))
+            ).limit(15)
+        ).all()
+        _map_items(bsr_fittings, sec_13)
+
+    # 9. Pipe work - Valves -> CESMM 14
+    sec_14 = sections_by_no.get("14")
+    if sec_14:
+        water_valves = db.scalars(
+            select(RateItem).where(RateItem.item_code == "W-VL01")
+        ).all()
+        _map_items(water_valves, sec_14)
+
+    # 10. Pipe work - Manholes -> CESMM 15
+    sec_15 = sections_by_no.get("15")
+    if sec_15:
+        manholes = db.scalars(
+            select(RateItem).where(
+                or_(
+                    RateItem.item_code.in_(["S-MH01", "D-IN01"]),
+                    and_(RateItem.rate_system == "BSR", RateItem.category_name.ilike("%manhole%")),
+                )
+            ).limit(10)
+        ).all()
+        _map_items(manholes, sec_15)
+
+    # 11. Supports and protection -> CESMM 16
+    sec_16 = sections_by_no.get("16")
+    if sec_16:
+        testing = db.scalars(
+            select(RateItem).where(RateItem.item_code == "W-TS01")
+        ).all()
+        _map_items(testing, sec_16)
+
+    # 12. Miscellaneous metalwork -> CESMM 18
+    sec_18 = sections_by_no.get("18")
+    if sec_18:
+        metal = db.scalars(
+            select(RateItem).where(RateItem.item_code == "H-GB01")
+        ).all()
+        _map_items(metal, sec_18)
+
+    # 13. Timber -> CESMM 19
+    sec_19 = sections_by_no.get("19")
+    if sec_19:
+        timber_items = db.scalars(
+            select(RateItem).where(RateItem.rate_system == "BSR", RateItem.category_name.ilike("%timber%")).limit(20)
+        ).all()
+        _map_items(timber_items, sec_19)
+
+    # 14. Roads and paving -> CESMM 23
+    sec_23 = sections_by_no.get("23")
+    if sec_23:
+        road_items = db.scalars(
+            select(RateItem).where(
+                or_(
+                    RateItem.item_code.in_(["H-SB01", "H-BT01", "H-TS01"]),
+                    and_(RateItem.rate_system == "BSR", RateItem.category_name.ilike("%paving%")),
+                )
+            )
+        ).all()
+        _map_items(road_items, sec_23)
+
+    # 15. Brickwork, block work and masonry -> CESMM 26
+    sec_26 = sections_by_no.get("26")
+    if sec_26:
+        brick_items = db.scalars(
+            select(RateItem).where(
+                or_(
+                    RateItem.item_code == "H-DR02",
+                    and_(RateItem.rate_system == "BSR", RateItem.category_name.ilike("%brick%")),
+                )
+            ).limit(20)
+        ).all()
+        _map_items(brick_items, sec_26)
+
+    # 16. Painting -> CESMM 27
+    sec_27 = sections_by_no.get("27")
+    if sec_27:
+        paint_items = db.scalars(
+            select(RateItem).where(RateItem.rate_system == "BSR", RateItem.category_name.ilike("%paint%")).limit(20)
+        ).all()
+        _map_items(paint_items, sec_27)
+
+    # 17. Waterproofing -> CESMM 28
+    sec_28 = sections_by_no.get("28")
+    if sec_28:
+        waterproof_items = db.scalars(
+            select(RateItem).where(RateItem.rate_system == "BSR", RateItem.category_name.ilike("%waterproof%")).limit(10)
+        ).all()
+        _map_items(waterproof_items, sec_28)
 
     db.commit()
-    logger.info("Successfully initialized baseline CESMM-SL mappings.")
+    logger.info("Successfully initialized baseline CESMM-SL mappings across all rate books.")
 
 
 def get_all_cesmm_sections(db: Session, active_only: bool = True) -> list[CESMMSection]:

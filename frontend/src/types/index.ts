@@ -126,6 +126,9 @@ export interface FilterOptions {
   cesmm_sections?: CESMMSection[];
   sector_systems?: Record<string, string[]>;
   category_presets?: Record<string, string[]>;
+  statuses?: string[];
+  source_pages?: number[];
+  total_matching?: number;
 }
 
 export interface CompareRow {

@@ -288,3 +288,73 @@ class TestCESMMSLClassification:
         finally:
             if temp_path.exists():
                 temp_path.unlink()
+
+    def test_11_cascading_filters_flow(self, client):
+        """
+        Strict Cascading Filter Flow Rule:
+        1. Rate Book first.
+        2. CESMM section only shows sections mapped to that rate book.
+        3. Category only shows categories matching both Rate Book and CESMM Section.
+        4. Subsequent filters cascade with non-empty matching records.
+        """
+        # Step 1: Base options
+        res_base = client.get("/api/rates/filters")
+        assert res_base.status_code == 200
+        data_base = res_base.json()
+        assert "BSR" in data_base["rate_systems"]
+        assert "HSR" in data_base["rate_systems"]
+
+        # Step 2: Rate Book = HSR
+        res_hsr = client.get("/api/rates/filters", params={"rate_system": "HSR"})
+        assert res_hsr.status_code == 200
+        hsr_sec_nos = [s["section_no"] for s in res_hsr.json()["cesmm_sections"]]
+        assert "05" in hsr_sec_nos  # Earth works is mapped
+        assert "01" not in hsr_sec_nos  # Unmapped sections are not shown for HSR
+
+        # Step 2: Rate Book = BSR
+        res_bsr = client.get("/api/rates/filters", params={"rate_system": "BSR"})
+        assert res_bsr.status_code == 200
+        bsr_sec_nos = [s["section_no"] for s in res_bsr.json()["cesmm_sections"]]
+        assert "04" in bsr_sec_nos  # Demolition is mapped
+        assert "08" in bsr_sec_nos  # Concrete is mapped
+
+        # Step 3: BSR + Section 04 (Demolition)
+        res_bsr_04 = client.get(
+            "/api/rates/filters",
+            params={"rate_system": "BSR", "cesmm_section_no": "04"},
+        )
+        assert res_bsr_04.status_code == 200
+        bsr_04_cats = res_bsr_04.json()["categories"]
+        assert len(bsr_04_cats) > 0
+        for c in bsr_04_cats:
+            assert "demolish" in c.lower(), f"Unexpected category under demolition: {c}"
+
+        # Step 4 & 5: Province and District cascade
+        demolish_cat = bsr_04_cats[0]
+        res_bsr_prov = client.get(
+            "/api/rates/filters",
+            params={"rate_system": "BSR", "cesmm_section_no": "04", "category": demolish_cat},
+        )
+        assert res_bsr_prov.status_code == 200
+        provs = res_bsr_prov.json()["provinces"]
+        assert len(provs) > 0
+
+        # Step 5: With Province selected
+        res_bsr_dist = client.get(
+            "/api/rates/filters",
+            params={
+                "rate_system": "BSR",
+                "cesmm_section_no": "04",
+                "category": demolish_cat,
+                "province": provs[0],
+            },
+        )
+        assert res_bsr_dist.status_code == 200
+        assert len(res_bsr_dist.json()["districts"]) > 0
+        assert res_bsr_dist.json()["total_matching"] > 0
+
+        # Test alias route /filter-options
+        res_alias = client.get("/api/rates/filter-options", params={"rate_system": "HSR"})
+        assert res_alias.status_code == 200
+        assert [s["section_no"] for s in res_alias.json()["cesmm_sections"]] == hsr_sec_nos
+

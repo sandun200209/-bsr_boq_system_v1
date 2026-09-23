@@ -62,37 +62,7 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
   const [loading, setLoading] = useState<boolean>(false);
   const [filterOpts, setFilterOpts] = useState<FilterOptions | null>(null);
 
-  // Context-aware category ordering if a CESMM section is selected
-  const visibleCategories = React.useMemo(() => {
-    const allCats = filterOpts?.categories || [];
-    if (!cesmmSectionNo) return allCats;
-    if (cesmmSectionNo === '04') {
-      const match = allCats.filter((c) => c.toLowerCase().includes('demolish'));
-      const rest = allCats.filter((c) => !c.toLowerCase().includes('demolish'));
-      return [...match, ...rest];
-    }
-    if (cesmmSectionNo === '05') {
-      const match = allCats.filter((c) => c.toLowerCase().includes('excavat') || c.toLowerCase().includes('earth'));
-      const rest = allCats.filter((c) => !c.toLowerCase().includes('excavat') && !c.toLowerCase().includes('earth'));
-      return [...match, ...rest];
-    }
-    if (cesmmSectionNo === '08' || cesmmSectionNo === '09' || cesmmSectionNo === '10') {
-      const match = allCats.filter((c) => c.toLowerCase().includes('concrete') || c.toLowerCase().includes('formwork'));
-      const rest = allCats.filter((c) => !c.toLowerCase().includes('concrete') && !c.toLowerCase().includes('formwork'));
-      return [...match, ...rest];
-    }
-    if (cesmmSectionNo === '12' || cesmmSectionNo === '13' || cesmmSectionNo === '14') {
-      const match = allCats.filter((c) => c.toLowerCase().includes('pipe') || c.toLowerCase().includes('plumber') || c.toLowerCase().includes('water'));
-      const rest = allCats.filter((c) => !c.toLowerCase().includes('pipe') && !c.toLowerCase().includes('plumber') && !c.toLowerCase().includes('water'));
-      return [...match, ...rest];
-    }
-    if (cesmmSectionNo === '26') {
-      const match = allCats.filter((c) => c.toLowerCase().includes('brick') || c.toLowerCase().includes('masonry'));
-      const rest = allCats.filter((c) => !c.toLowerCase().includes('brick') && !c.toLowerCase().includes('masonry'));
-      return [...match, ...rest];
-    }
-    return allCats;
-  }, [filterOpts?.categories, cesmmSectionNo]);
+
 
   // Copy notification state
   const [copiedId, setCopiedId] = useState<number | null>(null);
@@ -110,10 +80,22 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Load filter options on mount
+  // Dynamically load cascading filter options as selections change
   useEffect(() => {
-    api.getFilterOptions().then(setFilterOpts).catch(console.error);
-  }, []);
+    api.getFilterOptions({
+      rate_system: rateSystem || undefined,
+      cesmm_section_no: cesmmSectionNo || undefined,
+      category: category || undefined,
+      province: province || undefined,
+      district: district || undefined,
+      year: year ? parseInt(year) : undefined,
+      revision: revision || undefined,
+      vat_basis: vatBasis || undefined,
+      sheet: sheet || undefined,
+      status: status && status !== 'ALL' ? status : undefined,
+      sector: sector || undefined,
+    }).then(setFilterOpts).catch(console.error);
+  }, [rateSystem, cesmmSectionNo, category, province, district, year, revision, vatBasis, sheet, status, sector]);
 
   // Fetch search results
   const fetchRates = useCallback(async () => {
@@ -304,21 +286,158 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
     setPage(1);
   };
 
+  // Cascading enabled / satisfied states
+  const isRateBookSelected = Boolean(rateSystem);
+  const isCesmmEnabled = isRateBookSelected;
+  const isCesmmSelected = Boolean(isCesmmEnabled && cesmmSectionNo);
+
+  const isCategoryEnabled = isCesmmSelected;
+  const isCategorySelected = Boolean(isCategoryEnabled && category);
+
+  const isProvinceEnabled = isCategorySelected;
+  const isProvinceSelected = Boolean(isProvinceEnabled && province);
+
+  const isDistrictEnabled = isProvinceSelected;
+  const isDistrictSelected = Boolean(isDistrictEnabled && district);
+
+  const isYearEnabled = isDistrictSelected;
+  const isYearSelected = Boolean(isYearEnabled && year);
+
+  const isRevisionEnabled = isYearSelected;
+  const isRevisionSelected = Boolean(isRevisionEnabled && revision);
+
+  const isVatEnabled = isRevisionSelected;
+  const isVatSelected = Boolean(isVatEnabled && vatBasis);
+
+  const hasSheets = (filterOpts?.sheets?.length ?? 0) > 0;
+  const isSheetEnabled = isVatSelected && hasSheets;
+  const isSheetSatisfied = isVatSelected && (!hasSheets || Boolean(sheet));
+
+  const isStatusEnabled = isSheetSatisfied;
+  const isPageEnabled = isStatusEnabled;
+
+  // Strict Reset-on-Change handlers: each resets all downstream child filters
+  const handleRateSystemChange = (val: string) => {
+    setRateSystem(val);
+    setCesmmSectionNo('');
+    setCategory('');
+    setProvince('');
+    setDistrict('');
+    setYear('');
+    setRevision('');
+    setVatBasis('');
+    setSheet('');
+    setStatus('ALL');
+    setPageNumber('');
+    setPage(1);
+  };
+
+  const handleCesmmChange = (val: string) => {
+    setCesmmSectionNo(val);
+    setCategory('');
+    setProvince('');
+    setDistrict('');
+    setYear('');
+    setRevision('');
+    setVatBasis('');
+    setSheet('');
+    setStatus('ALL');
+    setPageNumber('');
+    setPage(1);
+  };
+
+  const handleCategoryChange = (val: string) => {
+    setCategory(val);
+    setProvince('');
+    setDistrict('');
+    setYear('');
+    setRevision('');
+    setVatBasis('');
+    setSheet('');
+    setStatus('ALL');
+    setPageNumber('');
+    setPage(1);
+  };
+
+  const handleProvinceChange = (val: string) => {
+    setProvince(val);
+    setDistrict('');
+    setYear('');
+    setRevision('');
+    setVatBasis('');
+    setSheet('');
+    setStatus('ALL');
+    setPageNumber('');
+    setPage(1);
+  };
+
+  const handleDistrictChange = (val: string) => {
+    setDistrict(val);
+    setYear('');
+    setRevision('');
+    setVatBasis('');
+    setSheet('');
+    setStatus('ALL');
+    setPageNumber('');
+    setPage(1);
+  };
+
+  const handleYearChange = (val: string) => {
+    setYear(val);
+    setRevision('');
+    setVatBasis('');
+    setSheet('');
+    setStatus('ALL');
+    setPageNumber('');
+    setPage(1);
+  };
+
+  const handleRevisionChange = (val: string) => {
+    setRevision(val);
+    setVatBasis('');
+    setSheet('');
+    setStatus('ALL');
+    setPageNumber('');
+    setPage(1);
+  };
+
+  const handleVatChange = (val: string) => {
+    setVatBasis(val);
+    setSheet('');
+    setStatus('ALL');
+    setPageNumber('');
+    setPage(1);
+  };
+
+  const handleSheetChange = (val: string) => {
+    setSheet(val);
+    setStatus('ALL');
+    setPageNumber('');
+    setPage(1);
+  };
+
+  const handleStatusChange = (val: string) => {
+    setStatus(val);
+    setPageNumber('');
+    setPage(1);
+  };
+
   const resetFilters = () => {
     setSearchTerm('');
+    setDebouncedSearch('');
     setSector('');
     setRateSystem('');
     setCesmmSectionNo('');
+    setCategory('');
     setProvince('');
     setDistrict('');
     setYear('');
     setRevision('');
     setDatasetType('');
     setVatBasis('');
-    setCategory('');
+    setSheet('');
     setStatus('ALL');
     setPageNumber('');
-    setSheet('');
     setSelectedIds(new Set());
     setSortBy('id');
     setSortOrder('asc');
@@ -332,7 +451,7 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
         <div>
           <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Rate Search</h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Instant trigram & full-text query engine across {total.toLocaleString()} rate items
+            Strict cascading query engine across {total.toLocaleString()} rate items
           </p>
         </div>
 
@@ -354,28 +473,68 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
 
       {/* Filter Toolbar */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs font-bold text-slate-700 uppercase tracking-wider">
-            <Filter className="w-3.5 h-3.5 text-blue-600" />
-            <span>Filters</span>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 uppercase tracking-wider">
+              <Filter className="w-3.5 h-3.5 text-blue-600" />
+              <span>Cascading Filters (Strict Flow 1 → 11)</span>
+            </div>
+            {filterOpts?.total_matching !== undefined && (
+              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                {filterOpts.total_matching.toLocaleString()} matching
+              </span>
+            )}
           </div>
           <button
             onClick={resetFilters}
-            className="text-xs text-blue-600 hover:text-blue-800 font-semibold"
+            className="text-xs text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1 transition-colors"
           >
-            Reset Filters
+            <RefreshCw className="w-3 h-3" />
+            <span>Reset Filters</span>
           </button>
+        </div>
+
+        {/* Step Progression Breadcrumb */}
+        <div className="flex items-center gap-1.5 overflow-x-auto text-[11px] py-1 border-y border-slate-100 no-scrollbar">
+          {[
+            { step: 1, name: 'Rate Book', active: isRateBookSelected },
+            { step: 2, name: 'CESMM-SL', active: isCesmmSelected },
+            { step: 3, name: 'Category', active: isCategorySelected },
+            { step: 4, name: 'Province', active: isProvinceSelected },
+            { step: 5, name: 'District', active: isDistrictSelected },
+            { step: 6, name: 'Year', active: isYearSelected },
+            { step: 7, name: 'Revision', active: isRevisionSelected },
+            { step: 8, name: 'VAT', active: isVatSelected },
+            { step: 9, name: 'Sheet', active: isSheetSatisfied },
+            { step: 10, name: 'Status', active: isStatusEnabled && status !== 'ALL' },
+            { step: 11, name: 'Page', active: Boolean(pageNumber) },
+          ].map((item, idx) => (
+            <React.Fragment key={item.step}>
+              {idx > 0 && <span className="text-slate-300 text-[10px]">→</span>}
+              <span
+                className={`px-1.5 py-0.5 rounded font-mono text-[10px] whitespace-nowrap transition-colors ${
+                  item.active
+                    ? 'bg-blue-600 text-white font-bold shadow-2xs'
+                    : (item.step === 1 || (item.step === 2 && isCesmmEnabled) || (item.step === 3 && isCategoryEnabled) || (item.step === 4 && isProvinceEnabled) || (item.step === 5 && isDistrictEnabled) || (item.step === 6 && isYearEnabled) || (item.step === 7 && isRevisionEnabled) || (item.step === 8 && isVatEnabled) || (item.step === 9 && isSheetEnabled) || (item.step === 10 && isStatusEnabled) || (item.step === 11 && isPageEnabled))
+                    ? 'bg-blue-50 text-blue-700 font-semibold border border-blue-200'
+                    : 'bg-slate-100 text-slate-400 select-none'
+                }`}
+              >
+                {item.step}. {item.name}
+              </span>
+            </React.Fragment>
+          ))}
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-11 gap-2.5">
           {/* 1: Rate Book */}
           <select
             value={rateSystem}
-            onChange={(e) => { setRateSystem(e.target.value); setPage(1); }}
-            className="text-xs rounded-lg border border-slate-300 py-1.5 px-2 bg-white focus:outline-none focus:ring-1 focus:ring-blue-600 font-medium text-slate-800 truncate"
-            title={rateSystem || 'All Rate Books'}
+            onChange={(e) => handleRateSystemChange(e.target.value)}
+            className="text-xs rounded-lg border border-blue-400 py-1.5 px-2 bg-blue-50/50 focus:outline-none focus:ring-2 focus:ring-blue-600 font-bold text-blue-950 truncate shadow-2xs cursor-pointer"
+            title={rateSystem ? `Rate Book: ${rateSystem}` : 'Step 1: Select Rate Book'}
           >
-            <option value="">All Rate Books</option>
+            <option value="">1. [Select Rate Book]</option>
             {(filterOpts?.rate_systems || RATE_SYSTEMS).map((rs) => (
               <option key={rs} value={rs}>{rs}</option>
             ))}
@@ -384,11 +543,16 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
           {/* 2: CESMM Section */}
           <select
             value={cesmmSectionNo}
-            onChange={(e) => { setCesmmSectionNo(e.target.value); setPage(1); }}
-            className="text-xs rounded-lg border border-indigo-300 py-1.5 px-2 bg-indigo-50/50 focus:outline-none focus:ring-1 focus:ring-indigo-600 font-medium text-indigo-950 truncate"
-            title={cesmmSectionNo ? `CESMM Section ${cesmmSectionNo}` : 'All CESMM Sections'}
+            disabled={!isCesmmEnabled}
+            onChange={(e) => handleCesmmChange(e.target.value)}
+            className={`text-xs rounded-lg py-1.5 px-2 font-medium truncate transition-colors ${
+              isCesmmEnabled
+                ? 'border border-indigo-400 bg-indigo-50/60 text-indigo-950 focus:outline-none focus:ring-2 focus:ring-indigo-600 cursor-pointer font-semibold shadow-2xs'
+                : 'border border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed select-none'
+            }`}
+            title={cesmmSectionNo ? `CESMM Section ${cesmmSectionNo}` : (isCesmmEnabled ? 'Step 2: Select CESMM Section' : 'Step 2: Disabled (Select Rate Book first)')}
           >
-            <option value="">All CESMM Sections</option>
+            <option value="">{isCesmmEnabled ? '2. [Select CESMM Section]' : '2. CESMM (Locked)'}</option>
             {filterOpts?.cesmm_sections?.map((cs) => (
               <option key={cs.id} value={cs.section_no}>
                 {cs.display_label || `${cs.section_no} - ${cs.name} (${cs.section_code})`}
@@ -399,12 +563,17 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
           {/* 3: Category */}
           <select
             value={category}
-            onChange={(e) => { setCategory(e.target.value); setPage(1); }}
-            className="text-xs rounded-lg border border-slate-300 py-1.5 px-2 bg-white focus:outline-none focus:ring-1 focus:ring-blue-600 truncate"
-            title={category || 'All Categories'}
+            disabled={!isCategoryEnabled}
+            onChange={(e) => handleCategoryChange(e.target.value)}
+            className={`text-xs rounded-lg py-1.5 px-2 truncate transition-colors ${
+              isCategoryEnabled
+                ? 'border border-slate-300 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer font-medium'
+                : 'border border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed select-none'
+            }`}
+            title={category || (isCategoryEnabled ? 'Step 3: Select Category' : 'Step 3: Disabled (Select CESMM Section first)')}
           >
-            <option value="">All Categories</option>
-            {visibleCategories.map((c) => (
+            <option value="">{isCategoryEnabled ? '3. [Select Category]' : '3. Category (Locked)'}</option>
+            {filterOpts?.categories?.map((c) => (
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
@@ -412,11 +581,17 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
           {/* 4: Province */}
           <select
             value={province}
-            onChange={(e) => { setProvince(e.target.value); setDistrict(''); setPage(1); }}
-            className="text-xs rounded-lg border border-slate-300 py-1.5 px-2 bg-white focus:outline-none focus:ring-1 focus:ring-blue-600"
+            disabled={!isProvinceEnabled}
+            onChange={(e) => handleProvinceChange(e.target.value)}
+            className={`text-xs rounded-lg py-1.5 px-2 transition-colors ${
+              isProvinceEnabled
+                ? 'border border-slate-300 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer'
+                : 'border border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed select-none'
+            }`}
+            title={province || (isProvinceEnabled ? 'Step 4: Select Province' : 'Step 4: Disabled (Select Category first)')}
           >
-            <option value="">All Provinces</option>
-            {filterOpts?.provinces.map((p) => (
+            <option value="">{isProvinceEnabled ? '4. [Select Province]' : '4. Province (Locked)'}</option>
+            {filterOpts?.provinces?.map((p) => (
               <option key={p} value={p}>{p}</option>
             ))}
           </select>
@@ -424,11 +599,17 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
           {/* 5: District */}
           <select
             value={district}
-            onChange={(e) => { setDistrict(e.target.value); setPage(1); }}
-            className="text-xs rounded-lg border border-slate-300 py-1.5 px-2 bg-white focus:outline-none focus:ring-1 focus:ring-blue-600"
+            disabled={!isDistrictEnabled}
+            onChange={(e) => handleDistrictChange(e.target.value)}
+            className={`text-xs rounded-lg py-1.5 px-2 transition-colors ${
+              isDistrictEnabled
+                ? 'border border-slate-300 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer'
+                : 'border border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed select-none'
+            }`}
+            title={district || (isDistrictEnabled ? 'Step 5: Select District' : 'Step 5: Disabled (Select Province first)')}
           >
-            <option value="">All Districts</option>
-            {filterOpts?.districts.map((d) => (
+            <option value="">{isDistrictEnabled ? '5. [Select District]' : '5. District (Locked)'}</option>
+            {filterOpts?.districts?.map((d) => (
               <option key={d} value={d}>{d}</option>
             ))}
           </select>
@@ -436,11 +617,17 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
           {/* 6: Year */}
           <select
             value={year}
-            onChange={(e) => { setYear(e.target.value); setPage(1); }}
-            className="text-xs rounded-lg border border-slate-300 py-1.5 px-2 bg-white focus:outline-none focus:ring-1 focus:ring-blue-600"
+            disabled={!isYearEnabled}
+            onChange={(e) => handleYearChange(e.target.value)}
+            className={`text-xs rounded-lg py-1.5 px-2 transition-colors ${
+              isYearEnabled
+                ? 'border border-slate-300 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer'
+                : 'border border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed select-none'
+            }`}
+            title={year || (isYearEnabled ? 'Step 6: Select Year' : 'Step 6: Disabled (Select District first)')}
           >
-            <option value="">All Years</option>
-            {filterOpts?.years.map((y) => (
+            <option value="">{isYearEnabled ? '6. [Select Year]' : '6. Year (Locked)'}</option>
+            {filterOpts?.years?.map((y) => (
               <option key={y} value={y}>{y}</option>
             ))}
           </select>
@@ -448,11 +635,17 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
           {/* 7: Revision */}
           <select
             value={revision}
-            onChange={(e) => { setRevision(e.target.value); setPage(1); }}
-            className="text-xs rounded-lg border border-slate-300 py-1.5 px-2 bg-white focus:outline-none focus:ring-1 focus:ring-blue-600"
+            disabled={!isRevisionEnabled}
+            onChange={(e) => handleRevisionChange(e.target.value)}
+            className={`text-xs rounded-lg py-1.5 px-2 transition-colors ${
+              isRevisionEnabled
+                ? 'border border-slate-300 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer'
+                : 'border border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed select-none'
+            }`}
+            title={revision || (isRevisionEnabled ? 'Step 7: Select Revision' : 'Step 7: Disabled (Select Year first)')}
           >
-            <option value="">All Revisions</option>
-            {filterOpts?.revisions.map((r) => (
+            <option value="">{isRevisionEnabled ? '7. [Select Revision]' : '7. Revision (Locked)'}</option>
+            {filterOpts?.revisions?.map((r) => (
               <option key={r} value={r}>{r}</option>
             ))}
           </select>
@@ -460,11 +653,17 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
           {/* 8: VAT */}
           <select
             value={vatBasis}
-            onChange={(e) => { setVatBasis(e.target.value); setPage(1); }}
-            className="text-xs rounded-lg border border-slate-300 py-1.5 px-2 bg-white focus:outline-none focus:ring-1 focus:ring-blue-600"
+            disabled={!isVatEnabled}
+            onChange={(e) => handleVatChange(e.target.value)}
+            className={`text-xs rounded-lg py-1.5 px-2 transition-colors ${
+              isVatEnabled
+                ? 'border border-slate-300 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer'
+                : 'border border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed select-none'
+            }`}
+            title={vatBasis || (isVatEnabled ? 'Step 8: Select VAT' : 'Step 8: Disabled (Select Revision first)')}
           >
-            <option value="">All VAT</option>
-            {filterOpts?.vat_bases.map((v) => (
+            <option value="">{isVatEnabled ? '8. [Select VAT Basis]' : '8. VAT (Locked)'}</option>
+            {filterOpts?.vat_bases?.map((v) => (
               <option key={v} value={v}>{v}</option>
             ))}
           </select>
@@ -472,11 +671,22 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
           {/* 9: Sheets */}
           <select
             value={sheet}
-            onChange={(e) => { setSheet(e.target.value); setPage(1); }}
-            className="text-xs rounded-lg border border-slate-300 py-1.5 px-2 bg-white focus:outline-none focus:ring-1 focus:ring-blue-600 truncate"
-            title={sheet || 'All Sheets'}
+            disabled={!isSheetEnabled}
+            onChange={(e) => handleSheetChange(e.target.value)}
+            className={`text-xs rounded-lg py-1.5 px-2 truncate transition-colors ${
+              isSheetEnabled
+                ? 'border border-slate-300 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer'
+                : 'border border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed select-none'
+            }`}
+            title={sheet || (isSheetEnabled ? 'Step 9: Select Sheet' : (!hasSheets && isVatSelected ? 'No sheets exist in this book (N/A)' : 'Step 9: Disabled (Select VAT first)'))}
           >
-            <option value="">All Sheets</option>
+            <option value="">
+              {!isVatSelected
+                ? '9. Sheet (Locked)'
+                : !hasSheets
+                ? '9. Sheet (N/A - None)'
+                : '9. [Select Sheet]'}
+            </option>
             {filterOpts?.sheets?.map((s) => (
               <option key={s} value={s}>{s}</option>
             ))}
@@ -485,23 +695,41 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
           {/* 10: Status */}
           <select
             value={status}
-            onChange={(e) => { setStatus(e.target.value); setPage(1); }}
-            className="text-xs rounded-lg border border-slate-300 py-1.5 px-2 bg-white focus:outline-none focus:ring-1 focus:ring-blue-600"
+            disabled={!isStatusEnabled}
+            onChange={(e) => handleStatusChange(e.target.value)}
+            className={`text-xs rounded-lg py-1.5 px-2 transition-colors ${
+              isStatusEnabled
+                ? 'border border-slate-300 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer'
+                : 'border border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed select-none'
+            }`}
+            title={status || (isStatusEnabled ? 'Step 10: Status' : 'Step 10: Disabled (Complete prior steps)')}
           >
-            <option value="ALL">All Status</option>
-            <option value="VALID">Valid</option>
-            <option value="APPROVED">Approved</option>
-            <option value="NEEDS_REVIEW">Needs Review</option>
+            {!isStatusEnabled ? (
+              <option value="ALL">10. Status (Locked)</option>
+            ) : (
+              <>
+                <option value="ALL">10. All Status</option>
+                {(filterOpts?.statuses?.length ? filterOpts.statuses : ['VALID', 'APPROVED', 'NEEDS_REVIEW']).map((st) => (
+                  <option key={st} value={st}>{st === 'VALID' ? 'Valid' : st === 'APPROVED' ? 'Approved' : st === 'NEEDS_REVIEW' ? 'Needs Review' : st}</option>
+                ))}
+              </>
+            )}
           </select>
 
           {/* 11: Page # */}
           <input
             type="number"
             min="1"
-            placeholder="Page #"
+            disabled={!isPageEnabled}
+            placeholder={isPageEnabled ? "11. Page #" : "11. Page (Locked)"}
             value={pageNumber}
             onChange={(e) => { setPageNumber(e.target.value); setPage(1); }}
-            className="text-xs rounded-lg border border-slate-300 py-1.5 px-2 bg-white focus:outline-none focus:ring-1 focus:ring-blue-600 w-full font-mono"
+            className={`text-xs rounded-lg py-1.5 px-2 font-mono w-full transition-colors ${
+              isPageEnabled
+                ? 'border border-slate-300 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600'
+                : 'border border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed select-none'
+            }`}
+            title={isPageEnabled ? "Step 11: Direct page quick jump" : "Step 11: Disabled (Select prior steps)"}
           />
         </div>
       </div>

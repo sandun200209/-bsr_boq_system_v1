@@ -277,7 +277,31 @@ export const api = {
     );
   },
 
-  getFilterOptions: () => request<FilterOptions>('/rates/filters'),
+  getFilterOptions: (params?: {
+    rate_system?: string;
+    cesmm_section_no?: string;
+    cesmm_section_id?: number;
+    category?: string;
+    province?: string;
+    district?: string;
+    year?: number;
+    revision?: string;
+    vat_basis?: string;
+    sheet?: string;
+    status?: string;
+    sector?: string;
+  }) => {
+    const q = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== '') {
+          q.append(k, String(v));
+        }
+      });
+    }
+    const queryStr = q.toString();
+    return request<FilterOptions>(queryStr ? `/rates/filters?${queryStr}` : '/rates/filters');
+  },
 
   // CESMM-SL (31 Work Sections Classification)
   getCesmmSections: (activeOnly = true) =>
