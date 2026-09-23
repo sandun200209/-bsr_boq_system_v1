@@ -74,15 +74,21 @@ def extract_csv(
             desc_col = header_map.get("description")
             unit_col = header_map.get("unit")
             rate_col = header_map.get("rate")
+            cesmm_no_col = header_map.get("cesmm_section_no")
+            cesmm_code_col = header_map.get("cesmm_section_code")
 
             raw_code = cleaned_row[code_col] if code_col is not None and code_col < len(cleaned_row) else ""
             raw_desc = cleaned_row[desc_col] if desc_col is not None and desc_col < len(cleaned_row) else ""
             raw_unit = cleaned_row[unit_col] if unit_col is not None and unit_col < len(cleaned_row) else ""
             raw_rate = cleaned_row[rate_col] if rate_col is not None and rate_col < len(cleaned_row) else ""
+            raw_cesmm_no = cleaned_row[cesmm_no_col] if cesmm_no_col is not None and cesmm_no_col < len(cleaned_row) else ""
+            raw_cesmm_code = cleaned_row[cesmm_code_col] if cesmm_code_col is not None and cesmm_code_col < len(cleaned_row) else ""
 
             code_clean = clean_text(raw_code)
             desc_clean = clean_text(raw_desc)
             unit_clean = clean_text(raw_unit)
+            cesmm_no_clean = clean_text(raw_cesmm_no) or None
+            cesmm_code_clean = clean_text(raw_cesmm_code) or None
             parsed_rate = parse_numeric_rate(raw_rate)
 
             # Check for non-rate noise
@@ -132,6 +138,8 @@ def extract_csv(
                     confidence_score=conf,
                     validation_status=status,
                     validation_notes=notes,
+                    cesmm_section_no=cesmm_no_clean,
+                    cesmm_section_code=cesmm_code_clean,
                 )
             )
 

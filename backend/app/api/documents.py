@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..config import settings
-from ..models import SourceFile, ImportJob, RateItem, User
+from ..models import SourceFile, ImportJob, RateItem, User, CESMMSection, RateItemCESMMSection
 from ..schemas import SourceFileOut, ImportJobOut
 from ..services.storage_service import StorageService, get_media_type
 from ..services.auth_service import get_current_user_optional, require_role, log_audit
@@ -174,6 +174,11 @@ def upload_document(
     batch_size = 500
     batch_records = []
 
+    # Cache CESMM sections for fast optional lookup
+    cesmm_sections_all = db.scalars(select(CESMMSection)).all()
+    cesmm_by_no = {s.section_no: s.id for s in cesmm_sections_all}
+    cesmm_by_code = {s.section_code.upper(): s.id for s in cesmm_sections_all}
+
     for item in extracted:
         status_val = item.validation_status
         if status_val == "VALID":
@@ -210,6 +215,19 @@ def upload_document(
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow(),
         )
+
+        # Optional CESMM-SL classification mapping from import file
+        if item.cesmm_section_no:
+            clean_no = str(item.cesmm_section_no).strip().zfill(2)
+            sec_id = cesmm_by_no.get(clean_no)
+            if sec_id:
+                rate_item.cesmm_mappings.append(RateItemCESMMSection(cesmm_section_id=sec_id, is_primary=True))
+        elif item.cesmm_section_code:
+            clean_code = str(item.cesmm_section_code).strip().upper()
+            sec_id = cesmm_by_code.get(clean_code)
+            if sec_id:
+                rate_item.cesmm_mappings.append(RateItemCESMMSection(cesmm_section_id=sec_id, is_primary=True))
+
         batch_records.append(rate_item)
 
         if len(batch_records) >= batch_size:

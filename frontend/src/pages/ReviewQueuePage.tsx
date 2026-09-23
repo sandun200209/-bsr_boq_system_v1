@@ -7,11 +7,13 @@ import {
   RefreshCw,
   Lock,
   FileSpreadsheet,
+  Layers,
 } from 'lucide-react';
 import { api } from '../api/client';
 import { RateItem } from '../types';
 import { SECTORS, SECTOR_BADGE_CLASSES } from '../constants/sriLanka';
 import { useAuth } from '../context/AuthContext';
+import { CESMMMappingModal } from '../components/CESMM/CESMMMappingModal';
 
 interface ReviewQueuePageProps {
   initialFileId?: number;
@@ -33,6 +35,7 @@ export const ReviewQueuePage: React.FC<ReviewQueuePageProps> = ({
   const [statusFilter, setStatusFilter] = useState<string>('NEEDS_REVIEW');
   const [sectorFilter, setSectorFilter] = useState<string>('');
   const [editingItem, setEditingItem] = useState<RateItem | null>(null);
+  const [cesmmModalItem, setCesmmModalItem] = useState<RateItem | null>(null);
 
   // Edit Form Fields
   const [editCode, setEditCode] = useState<string>('');
@@ -333,6 +336,31 @@ export const ReviewQueuePage: React.FC<ReviewQueuePageProps> = ({
                               {item.category_name}
                             </span>
                           )}
+                          {/* CESMM Badges */}
+                          {item.cesmm_sections && item.cesmm_sections.length > 0 && (() => {
+                            const sorted = [...item.cesmm_sections].sort((a, b) => (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0));
+                            const primary = sorted[0];
+                            const extraCount = sorted.length - 1;
+                            return (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setCesmmModalItem(item);
+                                }}
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition-colors"
+                                title={`CESMM-SL Section ${primary.section_no} (${primary.section_code}): ${primary.section_name}${extraCount > 0 ? ` +${extraCount} more` : ''}`}
+                              >
+                                <Layers className="w-2.5 h-2.5 text-indigo-500 shrink-0" />
+                                <span>CESMM {primary.section_no} · {primary.section_code}</span>
+                                {extraCount > 0 && (
+                                  <span className="bg-indigo-200 text-indigo-800 rounded px-1 text-[9px] font-bold">
+                                    +{extraCount}
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })()}
                         </div>
                         {item.raw_text && item.raw_text !== item.description && (
                           <div className="text-[10px] text-slate-400 font-mono mt-1 truncate max-w-sm" title={item.raw_text}>
@@ -373,6 +401,14 @@ export const ReviewQueuePage: React.FC<ReviewQueuePageProps> = ({
                       {/* Row Action Buttons */}
                       <td className="py-3 px-4 text-center">
                         <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            onClick={() => setCesmmModalItem(item)}
+                            title="Classify under CESMM-SL Work Sections"
+                            className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                          >
+                            <Layers className="w-3.5 h-3.5" />
+                          </button>
+
                           <button
                             disabled={!canReview}
                             onClick={() => startEditing(item)}
@@ -516,6 +552,17 @@ export const ReviewQueuePage: React.FC<ReviewQueuePageProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* CESMM Classification Modal */}
+      {cesmmModalItem && (
+        <CESMMMappingModal
+          item={cesmmModalItem}
+          onClose={() => setCesmmModalItem(null)}
+          onUpdated={() => {
+            loadQueue();
+          }}
+        />
       )}
     </div>
   );

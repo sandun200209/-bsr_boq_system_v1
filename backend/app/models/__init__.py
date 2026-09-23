@@ -1,7 +1,7 @@
 from __future__ import annotations
 from datetime import datetime
 from sqlalchemy import (
-    String, Integer, Float, Boolean, DateTime, ForeignKey, Text, Index
+    String, Integer, Float, Boolean, DateTime, ForeignKey, Text, Index, UniqueConstraint
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from ..database import Base
@@ -175,6 +175,9 @@ class RateItem(Base):
     master_mapping: Mapped["RateItemMasterMapping | None"] = relationship(
         back_populates="rate_item", cascade="all, delete-orphan", uselist=False
     )
+    cesmm_mappings: Mapped[list["RateItemCESMMSection"]] = relationship(
+        back_populates="rate_item", cascade="all, delete-orphan"
+    )
 
 class RateItemMasterMapping(Base):
     __tablename__ = "rate_item_master_mapping"
@@ -192,6 +195,56 @@ class RateItemMasterMapping(Base):
 
     master_item: Mapped["MasterItem"] = relationship(back_populates="mappings")
     rate_item: Mapped["RateItem"] = relationship(back_populates="master_mapping")
+
+# ---------------------------------------------------------------------------
+# CESMM-SL (Civil Engineering Standard Method of Measurement - Sri Lanka)
+# 31 Work Sections Classification & Mapping Models
+# ---------------------------------------------------------------------------
+
+class CESMMSection(Base):
+    __tablename__ = "cesmm_sections"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    section_no: Mapped[str] = mapped_column(String(10), unique=True, index=True)  # e.g. "01", "04", "31"
+    section_code: Mapped[str] = mapped_column(String(20), index=True)  # e.g. "A", "H1", "X"
+    name: Mapped[str] = mapped_column(String(255), nullable=False)  # e.g. "Demolition and site clearance"
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    rate_mappings: Mapped[list["RateItemCESMMSection"]] = relationship(
+        back_populates="cesmm_section", cascade="all, delete-orphan"
+    )
+
+    @property
+    def display_label(self) -> str:
+        return f"{self.section_no} - {self.name} (Section {self.section_code})"
+
+
+class RateItemCESMMSection(Base):
+    __tablename__ = "rate_item_cesmm_sections"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    rate_item_id: Mapped[int] = mapped_column(
+        ForeignKey("rate_items.id", ondelete="CASCADE"), index=True
+    )
+    cesmm_section_id: Mapped[int] = mapped_column(
+        ForeignKey("cesmm_sections.id", ondelete="CASCADE"), index=True
+    )
+    is_primary: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    rate_item: Mapped["RateItem"] = relationship(back_populates="cesmm_mappings")
+    cesmm_section: Mapped["CESMMSection"] = relationship(back_populates="rate_mappings")
+
+    __table_args__ = (
+        UniqueConstraint("rate_item_id", "cesmm_section_id", name="uq_rate_item_cesmm_section"),
+        Index("ix_rate_item_cesmm_lookup", "rate_item_id", "cesmm_section_id"),
+    )
 
 # Additional composite indexes for fast search and comparison queries
 Index(

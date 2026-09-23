@@ -89,6 +89,27 @@ export interface RateItem {
   verified_at?: string | null;
   original_filename?: string | null;
   updated_by_email?: string | null;
+  cesmm_sections?: RateItemCESMM[];
+}
+
+export interface CESMMSection {
+  id: number;
+  section_no: string;
+  section_code: string;
+  name: string;
+  section_name?: string;
+  is_active: boolean;
+  display_label?: string | null;
+}
+
+export interface RateItemCESMM {
+  id: number;
+  cesmm_section_id: number;
+  section_no: string;
+  section_code: string;
+  name: string;
+  section_name?: string;
+  is_primary: boolean;
 }
 
 export interface FilterOptions {
@@ -102,6 +123,7 @@ export interface FilterOptions {
   vat_bases: string[];
   categories: string[];
   sheets: string[];
+  cesmm_sections?: CESMMSection[];
   sector_systems?: Record<string, string[]>;
   category_presets?: Record<string, string[]>;
 }

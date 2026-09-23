@@ -2,12 +2,13 @@ from __future__ import annotations
 import math
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func, or_, desc, asc, text
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload, joinedload
 
 from ..config import settings
 from ..database import get_db
-from ..models import RateItem, SourceFile
-from ..schemas import RateItemOut, RateItemSearchResponse, FilterOptionsResponse
+from ..models import RateItem, SourceFile, CESMMSection, RateItemCESMMSection
+from ..schemas import RateItemOut, RateItemSearchResponse, FilterOptionsResponse, CESMMSectionOut, RateItemCESMMOut
+from ..services.cesmm_service import get_all_cesmm_sections, seed_cesmm_sections
 
 router = APIRouter(prefix="/rates", tags=["Rates"])
 
@@ -45,6 +46,23 @@ def get_filter_options(db: Session = Depends(get_db)):
         select(RateItem.source_sheet).distinct().where(RateItem.source_sheet.isnot(None)).order_by(RateItem.source_sheet)
     ).all()
 
+    # Fetch 31 standard CESMM sections
+    cesmm_sections_db = get_all_cesmm_sections(db, active_only=True)
+    if not cesmm_sections_db:
+        cesmm_sections_db = seed_cesmm_sections(db)
+
+    cesmm_out = [
+        CESMMSectionOut(
+            id=s.id,
+            section_no=s.section_no,
+            section_code=s.section_code,
+            name=s.name,
+            is_active=s.is_active,
+            display_label=f"{s.section_no} - {s.name} (Section {s.section_code})",
+        )
+        for s in cesmm_sections_db
+    ]
+
     # Merge with supported defaults so user can select empty sectors too
     all_sectors = list(dict.fromkeys(list(sectors_db) + settings.SUPPORTED_SECTORS))
     all_systems = list(dict.fromkeys(list(rate_systems_db) + settings.SUPPORTED_RATE_SYSTEMS))
@@ -60,6 +78,7 @@ def get_filter_options(db: Session = Depends(get_db)):
         vat_bases=list(vat_bases),
         categories=list(categories),
         sheets=list(sheets),
+        cesmm_sections=cesmm_out,
         sector_systems=settings.SECTOR_RATE_SYSTEM_MAP,
         category_presets=settings.SECTOR_CATEGORY_PRESETS,
     )
@@ -69,6 +88,8 @@ def search_rates(
     q: str | None = Query(None, description="Keywords, item code, description or partial search"),
     sector: str | None = Query(None),
     rate_system: str | None = Query(None),
+    cesmm_section_id: int | None = Query(None, description="Filter by CESMM section ID"),
+    cesmm_section_no: str | None = Query(None, description="Filter by CESMM section number e.g. 04 or 4"),
     province: str | None = Query(None),
     district: str | None = Query(None),
     year: int | None = Query(None),
@@ -90,8 +111,31 @@ def search_rates(
     # Filtering
     if sector:
         query = query.where(RateItem.sector == sector)
-    if rate_system:
-        query = query.where(RateItem.rate_system == rate_system)
+    if rate_system and rate_system.strip():
+        rs_clean = rate_system.strip()
+        if rs_clean.lower() in ("water", "water supply", "water supply rates"):
+            query = query.where(RateItem.rate_system.ilike("%water%"))
+        elif rs_clean.lower() == "bsr":
+            query = query.where(RateItem.rate_system == "BSR")
+        elif rs_clean.lower() == "hsr":
+            query = query.where(RateItem.rate_system == "HSR")
+        else:
+            query = query.where(RateItem.rate_system == rs_clean)
+    if cesmm_section_id is not None:
+        query = query.where(
+            RateItem.cesmm_mappings.any(
+                RateItemCESMMSection.cesmm_section_id == cesmm_section_id
+            )
+        )
+    elif cesmm_section_no and cesmm_section_no.strip():
+        clean_sec_no = cesmm_section_no.strip().zfill(2)
+        query = query.where(
+            RateItem.cesmm_mappings.any(
+                RateItemCESMMSection.cesmm_section.has(
+                    CESMMSection.section_no == clean_sec_no
+                )
+            )
+        )
     if province:
         query = query.where(RateItem.province == province)
     if district:
@@ -150,6 +194,11 @@ def search_rates(
     offset = (page - 1) * page_size
     query = query.offset(offset).limit(page_size)
 
+    # Eager load CESMM mappings and source_file
+    query = query.options(
+        selectinload(RateItem.cesmm_mappings).joinedload(RateItemCESMMSection.cesmm_section)
+    )
+
     items = db.scalars(query).all()
     pages = math.ceil(total / page_size) if total > 0 else 1
 
@@ -157,6 +206,18 @@ def search_rates(
     for it in items:
         item_out = RateItemOut.model_validate(it)
         item_out.original_filename = it.source_file.original_filename if it.source_file else None
+        item_out.cesmm_sections = [
+            RateItemCESMMOut(
+                id=m.id,
+                cesmm_section_id=m.cesmm_section_id,
+                section_no=m.cesmm_section.section_no,
+                section_code=m.cesmm_section.section_code,
+                name=m.cesmm_section.name,
+                is_primary=m.is_primary,
+            )
+            for m in sorted(it.cesmm_mappings, key=lambda x: (not x.is_primary, x.id))
+            if m.cesmm_section
+        ]
         result_items.append(item_out)
 
     return RateItemSearchResponse(
@@ -169,9 +230,25 @@ def search_rates(
 
 @router.get("/{rate_id}", response_model=RateItemOut)
 def get_rate_item(rate_id: int, db: Session = Depends(get_db)):
-    item = db.get(RateItem, rate_id)
+    item = db.scalar(
+        select(RateItem)
+        .where(RateItem.id == rate_id)
+        .options(selectinload(RateItem.cesmm_mappings).joinedload(RateItemCESMMSection.cesmm_section))
+    )
     if not item:
         raise HTTPException(status_code=404, detail="Rate item not found")
     out = RateItemOut.model_validate(item)
     out.original_filename = item.source_file.original_filename if item.source_file else None
+    out.cesmm_sections = [
+        RateItemCESMMOut(
+            id=m.id,
+            cesmm_section_id=m.cesmm_section_id,
+            section_no=m.cesmm_section.section_no,
+            section_code=m.cesmm_section.section_code,
+            name=m.cesmm_section.name,
+            is_primary=m.is_primary,
+        )
+        for m in sorted(item.cesmm_mappings, key=lambda x: (not x.is_primary, x.id))
+        if m.cesmm_section
+    ]
     return out

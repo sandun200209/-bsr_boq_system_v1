@@ -38,6 +38,16 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"Could not initialize pg_trgm extension or indexes: {e}")
 
+    # Seed CESMM-SL 31 sections and baseline mappings
+    try:
+        from .database import SessionLocal
+        from .services.cesmm_service import seed_cesmm_sections
+        with SessionLocal() as db:
+            seed_cesmm_sections(db)
+        logger.info("CESMM-SL 31 Work Sections checked/initialized.")
+    except Exception as e:
+        logger.warning(f"Could not initialize CESMM-SL sections: {e}")
+
     yield
 
     # Shutdown

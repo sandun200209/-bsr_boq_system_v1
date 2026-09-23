@@ -6,16 +6,19 @@ import {
   Check,
   Search,
   Sparkles,
+  Layers,
 } from 'lucide-react';
 import { api } from '../api/client';
-import { MasterItem, MasterSuggestion } from '../types';
+import { MasterItem, MasterSuggestion, RateItem } from '../types';
 import { SECTORS, RATE_SYSTEMS, SECTOR_RATE_SYSTEM_MAP, SECTOR_BADGE_CLASSES } from '../constants/sriLanka';
+import { CESMMMappingModal } from '../components/CESMM/CESMMMappingModal';
 
 export const MasterItemsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'registry' | 'suggestions'>('registry');
   const [masterItems, setMasterItems] = useState<MasterItem[]>([]);
   const [suggestions, setSuggestions] = useState<MasterSuggestion[]>([]);
   const [selectedMaster, setSelectedMaster] = useState<MasterItem | null>(null);
+  const [cesmmModalItem, setCesmmModalItem] = useState<RateItem | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sectorFilter, setSectorFilter] = useState<string>('');
@@ -291,20 +294,52 @@ export const MasterItemsPage: React.FC = () => {
                             <td className="py-2.5 px-3 font-mono font-bold text-blue-700">
                               {rate.item_code}
                             </td>
-                            <td className="py-2.5 px-3 text-slate-700 truncate max-w-xs" title={rate.description || ''}>
-                              {rate.description}
+                            <td className="py-2.5 px-3 text-slate-700 max-w-xs">
+                              <div className="truncate" title={rate.description || ''}>{rate.description}</div>
+                              {rate.cesmm_sections && rate.cesmm_sections.length > 0 && (() => {
+                                const sorted = [...rate.cesmm_sections].sort((a, b) => (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0));
+                                const primary = sorted[0];
+                                const extraCount = sorted.length - 1;
+                                return (
+                                  <div className="mt-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => setCesmmModalItem(rate)}
+                                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition-colors"
+                                      title={`CESMM-SL Section ${primary.section_no} (${primary.section_code}): ${primary.section_name}${extraCount > 0 ? ` +${extraCount} more` : ''}`}
+                                    >
+                                      <Layers className="w-2.5 h-2.5 text-indigo-500 shrink-0" />
+                                      <span>CESMM {primary.section_no} · {primary.section_code}</span>
+                                      {extraCount > 0 && (
+                                        <span className="bg-indigo-200 text-indigo-800 rounded px-1 text-[9px] font-bold">
+                                          +{extraCount}
+                                        </span>
+                                      )}
+                                    </button>
+                                  </div>
+                                );
+                              })()}
                             </td>
                             <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
                               {(rate.rate || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                             </td>
                             <td className="py-2.5 px-3 text-center">
-                              <button
-                                onClick={() => handleUnmap(rate.id)}
-                                title="Unlink mapping"
-                                className="p-1 text-slate-400 hover:text-rose-600 rounded"
-                              >
-                                <Unlink className="w-3.5 h-3.5" />
-                              </button>
+                              <div className="flex items-center justify-center gap-1">
+                                <button
+                                  onClick={() => setCesmmModalItem(rate)}
+                                  title="Manage CESMM Work Sections"
+                                  className="p-1 text-slate-400 hover:text-indigo-600 rounded"
+                                >
+                                  <Layers className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleUnmap(rate.id)}
+                                  title="Unlink mapping"
+                                  className="p-1 text-slate-400 hover:text-rose-600 rounded"
+                                >
+                                  <Unlink className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         ))}
@@ -503,6 +538,19 @@ export const MasterItemsPage: React.FC = () => {
             </div>
           </form>
         </div>
+      )}
+
+      {/* CESMM Classification Modal */}
+      {cesmmModalItem && (
+        <CESMMMappingModal
+          item={cesmmModalItem}
+          onClose={() => setCesmmModalItem(null)}
+          onUpdated={() => {
+            if (selectedMaster) {
+              selectMasterItem(selectedMaster.id);
+            }
+          }}
+        />
       )}
     </div>
   );

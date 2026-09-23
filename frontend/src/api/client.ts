@@ -10,6 +10,8 @@ import {
   AuthResponse,
   AuditLog,
   RateItemSearchResponse,
+  CESMMSection,
+  RateItemCESMM,
 } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
@@ -225,6 +227,8 @@ export const api = {
     q?: string;
     sector?: string;
     rate_system?: string;
+    cesmm_section_id?: number;
+    cesmm_section_no?: string;
     province?: string;
     district?: string;
     year?: number;
@@ -248,6 +252,8 @@ export const api = {
     if (params.q) q.set('q', params.q);
     if (params.sector) q.set('sector', params.sector);
     if (params.rate_system) q.set('rate_system', params.rate_system);
+    if (params.cesmm_section_id !== undefined) q.set('cesmm_section_id', params.cesmm_section_id.toString());
+    if (params.cesmm_section_no) q.set('cesmm_section_no', params.cesmm_section_no);
     if (params.province) q.set('province', params.province);
     if (params.district) q.set('district', params.district);
     if (params.year) q.set('year', params.year.toString());
@@ -272,6 +278,30 @@ export const api = {
   },
 
   getFilterOptions: () => request<FilterOptions>('/rates/filters'),
+
+  // CESMM-SL (31 Work Sections Classification)
+  getCesmmSections: (activeOnly = true) =>
+    request<CESMMSection[]>(`/cesmm/sections?active_only=${activeOnly}`),
+
+  getItemCesmmMappings: (rateId: number) =>
+    request<RateItemCESMM[]>(`/cesmm/items/${rateId}`),
+
+  assignItemCesmmMappings: (rateId: number, mappings: { cesmm_section_id: number; is_primary?: boolean }[]) =>
+    request<RateItemCESMM[]>(`/cesmm/items/${rateId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mappings }),
+    }),
+
+  removeItemCesmmMapping: (rateId: number, cesmmSectionId: number) =>
+    request<RateItemCESMM[]>(`/cesmm/items/${rateId}/${cesmmSectionId}`, {
+      method: 'DELETE',
+    }),
+
+  setPrimaryCesmmMapping: (rateId: number, cesmmSectionId: number) =>
+    request<RateItemCESMM[]>(`/cesmm/items/${rateId}/primary/${cesmmSectionId}`, {
+      method: 'PUT',
+    }),
 
   // Compare
   getCompare: (params: {

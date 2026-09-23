@@ -25,6 +25,8 @@ class ExtractedItem:
     sheet_revision: str | None = None
     sheet_vat_basis: str | None = None
     sheet_dataset_type: str | None = None
+    cesmm_section_no: str | None = None
+    cesmm_section_code: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -49,4 +51,6 @@ HEADER_ALIASES = {
     "description": ("description", "discription", "item description", "item discription", "desc", "details", "work description", "specification", "particulars", "item particulars", "description of work"),
     "unit": ("unit", "uom", "unit of measure", "unit of measurement", "units", "unit."),
     "rate": ("rate", "basic rate", "rate (lkr)", "rate lkr", "price", "unit rate", "current rate", "rate (rs.)", "amount", "approved rate"),
+    "cesmm_section_no": ("cesmm_section_no", "cesmm_section", "cesmm_no", "cesmm no", "cesmm section no", "cesmm", "cesmm_sl", "cesmm section"),
+    "cesmm_section_code": ("cesmm_section_code", "cesmm_code", "cesmm code", "cesmm section code"),
 }

@@ -12,6 +12,7 @@ from .review import router as review_router
 from .master_items import router as master_items_router
 from .export import router as export_router
 from .projects import router as projects_router
+from .cesmm import router as cesmm_router
 
 api_router = APIRouter()
 api_router.include_router(health_router)
@@ -26,4 +27,5 @@ api_router.include_router(review_router)
 api_router.include_router(master_items_router)
 api_router.include_router(export_router)
 api_router.include_router(projects_router)
+api_router.include_router(cesmm_router)
 

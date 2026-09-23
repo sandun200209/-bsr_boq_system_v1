@@ -19,7 +19,7 @@ def find_header_mapping(row_values: list[str], target_year: int | None = None) -
     for col_idx, text in enumerate(normalized):
         if not text:
             continue
-        for key in ("code", "description", "unit"):
+        for key in ("code", "description", "unit", "cesmm_section_no", "cesmm_section_code"):
             if key not in mapping:
                 aliases = HEADER_ALIASES[key]
                 if any(alias == text or (len(alias) > 3 and alias in text) for alias in aliases):
@@ -149,15 +149,21 @@ def extract_excel(
             desc_col = header_map.get("description")
             unit_col = header_map.get("unit")
             rate_col = header_map.get("rate")
+            cesmm_no_col = header_map.get("cesmm_section_no")
+            cesmm_code_col = header_map.get("cesmm_section_code")
 
             raw_code = str_row[code_col] if code_col is not None and code_col < len(str_row) else ""
             raw_desc = str_row[desc_col] if desc_col is not None and desc_col < len(str_row) else ""
             raw_unit = str_row[unit_col] if unit_col is not None and unit_col < len(str_row) else ""
             raw_rate = row[rate_col] if rate_col is not None and rate_col < len(row) else None
+            raw_cesmm_no = str_row[cesmm_no_col] if cesmm_no_col is not None and cesmm_no_col < len(str_row) else ""
+            raw_cesmm_code = str_row[cesmm_code_col] if cesmm_code_col is not None and cesmm_code_col < len(str_row) else ""
 
             code_clean = clean_text(raw_code)
             desc_clean = clean_text(raw_desc)
             unit_clean = clean_text(raw_unit)
+            cesmm_no_clean = clean_text(raw_cesmm_no) or None
+            cesmm_code_clean = clean_text(raw_cesmm_code) or None
             parsed_rate = parse_numeric_rate(raw_rate)
 
             # Filter out Excel error formulas like #N/A, #VALUE!, #REF!
@@ -261,6 +267,8 @@ def extract_excel(
                     sheet_revision=sheet_revision,
                     sheet_vat_basis=sheet_vat_basis,
                     sheet_dataset_type=sheet_dataset_type,
+                    cesmm_section_no=cesmm_no_clean,
+                    cesmm_section_code=cesmm_code_clean,
                 )
             )
 

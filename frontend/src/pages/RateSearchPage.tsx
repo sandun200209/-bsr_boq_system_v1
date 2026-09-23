@@ -11,10 +11,12 @@ import {
   X,
   Download,
   ExternalLink,
+  Layers,
 } from 'lucide-react';
 import { api } from '../api/client';
 import { RateItem, FilterOptions } from '../types';
-import { SECTORS, RATE_SYSTEMS, SECTOR_BADGE_CLASSES } from '../constants/sriLanka';
+import { RATE_SYSTEMS, SECTOR_BADGE_CLASSES } from '../constants/sriLanka';
+import { CESMMMappingModal } from '../components/CESMM/CESMMMappingModal';
 
 interface RateSearchPageProps {
   initialFilters?: any;
@@ -32,6 +34,7 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
   const [debouncedSearch, setDebouncedSearch] = useState<string>(initialFilters?.q || '');
   const [sector, setSector] = useState<string>(initialFilters?.sector || '');
   const [rateSystem, setRateSystem] = useState<string>(initialFilters?.rate_system || '');
+  const [cesmmSectionNo, setCesmmSectionNo] = useState<string>(initialFilters?.cesmm_section_no || '');
   const [province, setProvince] = useState<string>(initialFilters?.province || '');
   const [district, setDistrict] = useState<string>(initialFilters?.district || '');
   const [year, setYear] = useState<string>(initialFilters?.year ? String(initialFilters.year) : '');
@@ -42,6 +45,9 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
   const [status, setStatus] = useState<string>('ALL');
   const [pageNumber, setPageNumber] = useState<string>('');
   const [sheet, setSheet] = useState<string>('');
+
+  // Modal for CESMM Mapping
+  const [cesmmModalItem, setCesmmModalItem] = useState<RateItem | null>(null);
 
   // Sorting & Pagination (Default to book order id asc)
   const [sortBy, setSortBy] = useState<string>('id');
@@ -55,6 +61,38 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
   const [totalPages, setTotalPages] = useState<number>(1);
   const [loading, setLoading] = useState<boolean>(false);
   const [filterOpts, setFilterOpts] = useState<FilterOptions | null>(null);
+
+  // Context-aware category ordering if a CESMM section is selected
+  const visibleCategories = React.useMemo(() => {
+    const allCats = filterOpts?.categories || [];
+    if (!cesmmSectionNo) return allCats;
+    if (cesmmSectionNo === '04') {
+      const match = allCats.filter((c) => c.toLowerCase().includes('demolish'));
+      const rest = allCats.filter((c) => !c.toLowerCase().includes('demolish'));
+      return [...match, ...rest];
+    }
+    if (cesmmSectionNo === '05') {
+      const match = allCats.filter((c) => c.toLowerCase().includes('excavat') || c.toLowerCase().includes('earth'));
+      const rest = allCats.filter((c) => !c.toLowerCase().includes('excavat') && !c.toLowerCase().includes('earth'));
+      return [...match, ...rest];
+    }
+    if (cesmmSectionNo === '08' || cesmmSectionNo === '09' || cesmmSectionNo === '10') {
+      const match = allCats.filter((c) => c.toLowerCase().includes('concrete') || c.toLowerCase().includes('formwork'));
+      const rest = allCats.filter((c) => !c.toLowerCase().includes('concrete') && !c.toLowerCase().includes('formwork'));
+      return [...match, ...rest];
+    }
+    if (cesmmSectionNo === '12' || cesmmSectionNo === '13' || cesmmSectionNo === '14') {
+      const match = allCats.filter((c) => c.toLowerCase().includes('pipe') || c.toLowerCase().includes('plumber') || c.toLowerCase().includes('water'));
+      const rest = allCats.filter((c) => !c.toLowerCase().includes('pipe') && !c.toLowerCase().includes('plumber') && !c.toLowerCase().includes('water'));
+      return [...match, ...rest];
+    }
+    if (cesmmSectionNo === '26') {
+      const match = allCats.filter((c) => c.toLowerCase().includes('brick') || c.toLowerCase().includes('masonry'));
+      const rest = allCats.filter((c) => !c.toLowerCase().includes('brick') && !c.toLowerCase().includes('masonry'));
+      return [...match, ...rest];
+    }
+    return allCats;
+  }, [filterOpts?.categories, cesmmSectionNo]);
 
   // Copy notification state
   const [copiedId, setCopiedId] = useState<number | null>(null);
@@ -85,6 +123,7 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
         q: debouncedSearch || undefined,
         sector: sector || undefined,
         rate_system: rateSystem || undefined,
+        cesmm_section_no: cesmmSectionNo || undefined,
         province: province || undefined,
         district: district || undefined,
         year: year ? parseInt(year) : undefined,
@@ -108,7 +147,7 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, sector, rateSystem, province, district, year, revision, datasetType, vatBasis, category, status, pageNumber, sheet, sortBy, sortOrder, page, pageSize]);
+  }, [debouncedSearch, sector, rateSystem, cesmmSectionNo, province, district, year, revision, datasetType, vatBasis, category, status, pageNumber, sheet, sortBy, sortOrder, page, pageSize]);
 
   useEffect(() => {
     fetchRates();
@@ -149,6 +188,9 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
       setLoading(true);
       const res = await api.searchRates({
         q: debouncedSearch || undefined,
+        sector: sector || undefined,
+        rate_system: rateSystem || undefined,
+        cesmm_section_no: cesmmSectionNo || undefined,
         province: province || undefined,
         district: district || undefined,
         year: year ? parseInt(year) : undefined,
@@ -185,6 +227,9 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
         setLoading(true);
         const res = await api.searchRates({
           q: debouncedSearch || undefined,
+          sector: sector || undefined,
+          rate_system: rateSystem || undefined,
+          cesmm_section_no: cesmmSectionNo || undefined,
           province: province || undefined,
           district: district || undefined,
           year: year ? parseInt(year) : undefined,
@@ -263,6 +308,7 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
     setSearchTerm('');
     setSector('');
     setRateSystem('');
+    setCesmmSectionNo('');
     setProvince('');
     setDistrict('');
     setYear('');
@@ -322,33 +368,48 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-11 gap-2.5">
-          {/* Sector */}
-          <select
-            value={sector}
-            onChange={(e) => { setSector(e.target.value); setPage(1); }}
-            className="text-xs rounded-lg border border-slate-300 py-1.5 px-2 bg-white focus:outline-none focus:ring-1 focus:ring-blue-600 font-medium text-slate-800 truncate"
-            title={sector || 'All Sectors'}
-          >
-            <option value="">All Sectors</option>
-            {(filterOpts?.sectors || SECTORS).map((s) => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
-
-          {/* Rate System */}
+          {/* 1: Rate Book */}
           <select
             value={rateSystem}
             onChange={(e) => { setRateSystem(e.target.value); setPage(1); }}
             className="text-xs rounded-lg border border-slate-300 py-1.5 px-2 bg-white focus:outline-none focus:ring-1 focus:ring-blue-600 font-medium text-slate-800 truncate"
-            title={rateSystem || 'All Systems'}
+            title={rateSystem || 'All Rate Books'}
           >
-            <option value="">All Systems</option>
+            <option value="">All Rate Books</option>
             {(filterOpts?.rate_systems || RATE_SYSTEMS).map((rs) => (
               <option key={rs} value={rs}>{rs}</option>
             ))}
           </select>
 
-          {/* Province */}
+          {/* 2: CESMM Section */}
+          <select
+            value={cesmmSectionNo}
+            onChange={(e) => { setCesmmSectionNo(e.target.value); setPage(1); }}
+            className="text-xs rounded-lg border border-indigo-300 py-1.5 px-2 bg-indigo-50/50 focus:outline-none focus:ring-1 focus:ring-indigo-600 font-medium text-indigo-950 truncate"
+            title={cesmmSectionNo ? `CESMM Section ${cesmmSectionNo}` : 'All CESMM Sections'}
+          >
+            <option value="">All CESMM Sections</option>
+            {filterOpts?.cesmm_sections?.map((cs) => (
+              <option key={cs.id} value={cs.section_no}>
+                {cs.section_no} - {cs.section_name} ({cs.section_code})
+              </option>
+            ))}
+          </select>
+
+          {/* 3: Category */}
+          <select
+            value={category}
+            onChange={(e) => { setCategory(e.target.value); setPage(1); }}
+            className="text-xs rounded-lg border border-slate-300 py-1.5 px-2 bg-white focus:outline-none focus:ring-1 focus:ring-blue-600 truncate"
+            title={category || 'All Categories'}
+          >
+            <option value="">All Categories</option>
+            {visibleCategories.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+
+          {/* 4: Province */}
           <select
             value={province}
             onChange={(e) => { setProvince(e.target.value); setDistrict(''); setPage(1); }}
@@ -360,7 +421,7 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
             ))}
           </select>
 
-          {/* District */}
+          {/* 5: District */}
           <select
             value={district}
             onChange={(e) => { setDistrict(e.target.value); setPage(1); }}
@@ -372,7 +433,7 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
             ))}
           </select>
 
-          {/* Year */}
+          {/* 6: Year */}
           <select
             value={year}
             onChange={(e) => { setYear(e.target.value); setPage(1); }}
@@ -384,7 +445,7 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
             ))}
           </select>
 
-          {/* Revision */}
+          {/* 7: Revision */}
           <select
             value={revision}
             onChange={(e) => { setRevision(e.target.value); setPage(1); }}
@@ -396,19 +457,7 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
             ))}
           </select>
 
-          {/* Category */}
-          <select
-            value={category}
-            onChange={(e) => { setCategory(e.target.value); setPage(1); }}
-            className="text-xs rounded-lg border border-slate-300 py-1.5 px-2 bg-white focus:outline-none focus:ring-1 focus:ring-blue-600"
-          >
-            <option value="">All Categories</option>
-            {filterOpts?.categories.map((c) => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
-
-          {/* VAT Basis */}
+          {/* 8: VAT */}
           <select
             value={vatBasis}
             onChange={(e) => { setVatBasis(e.target.value); setPage(1); }}
@@ -420,7 +469,7 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
             ))}
           </select>
 
-          {/* Sheet */}
+          {/* 9: Sheets */}
           <select
             value={sheet}
             onChange={(e) => { setSheet(e.target.value); setPage(1); }}
@@ -433,23 +482,23 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
             ))}
           </select>
 
-          {/* Status */}
+          {/* 10: Status */}
           <select
             value={status}
             onChange={(e) => { setStatus(e.target.value); setPage(1); }}
             className="text-xs rounded-lg border border-slate-300 py-1.5 px-2 bg-white focus:outline-none focus:ring-1 focus:ring-blue-600"
           >
-            <option value="ALL">All Statuses</option>
+            <option value="ALL">All Status</option>
             <option value="VALID">Valid</option>
             <option value="APPROVED">Approved</option>
             <option value="NEEDS_REVIEW">Needs Review</option>
           </select>
 
-          {/* Page Number */}
+          {/* 11: Page # */}
           <input
             type="number"
             min="1"
-            placeholder="Page # (PDF)"
+            placeholder="Page #"
             value={pageNumber}
             onChange={(e) => { setPageNumber(e.target.value); setPage(1); }}
             className="text-xs rounded-lg border border-slate-300 py-1.5 px-2 bg-white focus:outline-none focus:ring-1 focus:ring-blue-600 w-full font-mono"
@@ -651,6 +700,44 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
                             {item.category_name}
                           </span>
                         )}
+                        {/* CESMM Badges */}
+                        {item.cesmm_sections && item.cesmm_sections.length > 0 && (() => {
+                          const sorted = [...item.cesmm_sections].sort((a, b) => (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0));
+                          const primary = sorted[0];
+                          const extraCount = sorted.length - 1;
+                          return (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setCesmmModalItem(item);
+                              }}
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 hover:border-indigo-300 transition-colors text-left"
+                              title={`CESMM-SL Section ${primary.section_no} (${primary.section_code}): ${primary.section_name}${primary.is_primary ? ' [Primary]' : ''}${extraCount > 0 ? ` +${extraCount} more` : ''}`}
+                            >
+                              <Layers className="w-2.5 h-2.5 text-indigo-500 shrink-0" />
+                              <span>CESMM {primary.section_no} · Section {primary.section_code}</span>
+                              {extraCount > 0 && (
+                                <span className="bg-indigo-200 text-indigo-800 rounded px-1 text-[9px] font-bold">
+                                  +{extraCount}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })()}
+                        {(!item.cesmm_sections || item.cesmm_sections.length === 0) && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setCesmmModalItem(item);
+                            }}
+                            className="opacity-0 group-hover:opacity-100 text-[10px] text-slate-400 hover:text-indigo-600 px-1 py-0.5 border border-dashed border-slate-300 hover:border-indigo-300 rounded transition-all"
+                            title="Assign CESMM Section"
+                          >
+                            + CESMM
+                          </button>
+                        )}
                       </div>
                     </td>
 
@@ -733,19 +820,28 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
                       </div>
                     </td>
 
-                    {/* Copy Button */}
+                    {/* Action Column */}
                     <td className="py-3 px-3 text-center">
-                      <button
-                        onClick={() => handleCopy(item)}
-                        title="Copy item details to clipboard"
-                        className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-all"
-                      >
-                        {copiedId === item.id ? (
-                          <Check className="w-4 h-4 text-emerald-600" />
-                        ) : (
-                          <Copy className="w-4 h-4" />
-                        )}
-                      </button>
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          onClick={() => setCesmmModalItem(item)}
+                          title="Classify under CESMM-SL Work Sections"
+                          className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                        >
+                          <Layers className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleCopy(item)}
+                          title="Copy item details to clipboard"
+                          className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-all"
+                        >
+                          {copiedId === item.id ? (
+                            <Check className="w-4 h-4 text-emerald-600" />
+                          ) : (
+                            <Copy className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -807,6 +903,17 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
           <Check className="w-4 h-4 text-emerald-400 shrink-0" />
           <span className="text-xs font-medium">{copyToast}</span>
         </div>
+      )}
+
+      {/* CESMM Classification Modal */}
+      {cesmmModalItem && (
+        <CESMMMappingModal
+          item={cesmmModalItem}
+          onClose={() => setCesmmModalItem(null)}
+          onUpdated={() => {
+            fetchRates();
+          }}
+        />
       )}
     </div>
   );

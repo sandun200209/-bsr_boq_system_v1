@@ -49,6 +49,34 @@ class ImportJobOut(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+# ----------------- CESMM-SL Work Sections -----------------
+class CESMMSectionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    section_no: str
+    section_code: str
+    name: str
+    is_active: bool
+    display_label: str | None = None
+
+class RateItemCESMMOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    cesmm_section_id: int
+    section_no: str
+    section_code: str
+    name: str
+    is_primary: bool
+
+class CESMMAssignEntry(BaseModel):
+    cesmm_section_id: int
+    is_primary: bool = False
+
+class RateItemCESMMAssignRequest(BaseModel):
+    mappings: list[CESMMAssignEntry] = []
+
 # ----------------- Rate Items -----------------
 class RateItemOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -83,6 +111,7 @@ class RateItemOut(BaseModel):
     sector: str = "Building Works"
     rate_system: str = "BSR"
     updated_by_email: str | None = None
+    cesmm_sections: list[RateItemCESMMOut] = []
 
 class RateItemUpdate(BaseModel):
     item_code: str | None = None
@@ -114,6 +143,7 @@ class FilterOptionsResponse(BaseModel):
     vat_bases: list[str]
     categories: list[str]
     sheets: list[str] = []
+    cesmm_sections: list[CESMMSectionOut] = []
     sector_systems: dict[str, list[str]] = {}
     category_presets: dict[str, list[str]] = {}
 
