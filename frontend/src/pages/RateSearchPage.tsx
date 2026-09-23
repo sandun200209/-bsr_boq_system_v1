@@ -391,7 +391,7 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
             <option value="">All CESMM Sections</option>
             {filterOpts?.cesmm_sections?.map((cs) => (
               <option key={cs.id} value={cs.section_no}>
-                {cs.section_no} - {cs.section_name} ({cs.section_code})
+                {cs.display_label || `${cs.section_no} - ${cs.name} (${cs.section_code})`}
               </option>
             ))}
           </select>
@@ -713,7 +713,7 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
                                 setCesmmModalItem(item);
                               }}
                               className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 hover:border-indigo-300 transition-colors text-left"
-                              title={`CESMM-SL Section ${primary.section_no} (${primary.section_code}): ${primary.section_name}${primary.is_primary ? ' [Primary]' : ''}${extraCount > 0 ? ` +${extraCount} more` : ''}`}
+                              title={`CESMM-SL Section ${primary.section_no} (${primary.section_code}): ${primary.name || primary.section_name}${primary.is_primary ? ' [Primary]' : ''}${extraCount > 0 ? ` +${extraCount} more` : ''}`}
                             >
                               <Layers className="w-2.5 h-2.5 text-indigo-500 shrink-0" />
                               <span>CESMM {primary.section_no} · Section {primary.section_code}</span>

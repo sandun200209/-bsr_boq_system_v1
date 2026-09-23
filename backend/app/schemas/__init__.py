@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Any
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 # ----------------- Source Files -----------------
 class SourceFileBase(BaseModel):
@@ -60,6 +60,10 @@ class CESMMSectionOut(BaseModel):
     is_active: bool
     display_label: str | None = None
 
+    @computed_field
+    def section_name(self) -> str:
+        return self.name
+
 class RateItemCESMMOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -69,6 +73,10 @@ class RateItemCESMMOut(BaseModel):
     section_code: str
     name: str
     is_primary: bool
+
+    @computed_field
+    def section_name(self) -> str:
+        return self.name
 
 class CESMMAssignEntry(BaseModel):
     cesmm_section_id: int

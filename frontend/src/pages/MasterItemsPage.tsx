@@ -306,7 +306,7 @@ export const MasterItemsPage: React.FC = () => {
                                       type="button"
                                       onClick={() => setCesmmModalItem(rate)}
                                       className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition-colors"
-                                      title={`CESMM-SL Section ${primary.section_no} (${primary.section_code}): ${primary.section_name}${extraCount > 0 ? ` +${extraCount} more` : ''}`}
+                                      title={`CESMM-SL Section ${primary.section_no} (${primary.section_code}): ${primary.name || primary.section_name}${extraCount > 0 ? ` +${extraCount} more` : ''}`}
                                     >
                                       <Layers className="w-2.5 h-2.5 text-indigo-500 shrink-0" />
                                       <span>CESMM {primary.section_no} · {primary.section_code}</span>
