@@ -16,6 +16,7 @@ import {
   LogOut,
   X,
   User as UserIcon,
+  BookMarked,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -44,6 +45,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'projects', label: 'Project Estimating', icon: FolderKanban },
     { id: 'import', label: 'Import Center', icon: UploadCloud },
+    { id: 'bsr-parts', label: 'BSR Parts Library', icon: BookMarked },
     { id: 'search', label: 'Rate Search', icon: Search },
     { id: 'compare', label: 'Compare Rates', icon: GitCompare },
     { id: 'review', label: 'Review Queue', icon: CheckSquare, badge: reviewCount },

@@ -48,11 +48,16 @@ def get_or_create_default_project(db: Session) -> Project:
         )
     )
     if proj:
-        if "Updated Title" in proj.project_name or "Temporary Test Title" in proj.project_name:
-            proj.project_name = "DGH Matara - Operating Theatre Renovation & Consolidation"
-            db.commit()
-            db.refresh(proj)
-        return proj
+        demo_sec = next((s for s in proj.sections if s.section_code == "SEC-DEMO"), None)
+        if demo_sec and len(demo_sec.items) >= 2:
+            if "Updated Title" in proj.project_name or "Temporary Test Title" in proj.project_name:
+                proj.project_name = "DGH Matara - Operating Theatre Renovation & Consolidation"
+                db.commit()
+                db.refresh(proj)
+            return proj
+        # If project has empty sections, clean up and reseed
+        db.delete(proj)
+        db.commit()
 
     proj = Project(
         project_code="MATARA-OT-REV7",

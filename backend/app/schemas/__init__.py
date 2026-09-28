@@ -589,3 +589,398 @@ class ProjectExportRequest(BaseModel):
     template_id: int | None = None
     format: str = "excel"  # 'excel' or 'pdf'
 
+
+# ----------------- Master BOQ Working Workspace -----------------
+
+class MasterBOQItemBase(BaseModel):
+    item_no: str | None = None
+    description: str
+    unit: str
+    quantity: float = 0.0
+    rate: float = 0.0
+    notes: str | None = None
+    sort_order: int = 0
+    is_custom: bool = False
+
+class MasterBOQItemCreate(BaseModel):
+    description: str
+    unit: str
+    quantity: float = 0.0
+    rate: float = 0.0
+    item_no: str | None = None
+    notes: str | None = None
+    is_custom: bool = True
+
+class MasterBOQItemUpdate(BaseModel):
+    item_no: str | None = None
+    description: str | None = None
+    unit: str | None = None
+    quantity: float | None = None
+    rate: float | None = None
+    notes: str | None = None
+    sort_order: int | None = None
+
+class MasterBOQItemOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    master_boq_id: int
+    source_rate_item_id: int | None = None
+    source_rate_book: str | None = None
+    source_code: str | None = None
+    source_category: str | None = None
+    source_cesmm_section: str | None = None
+    source_year: int | None = None
+    source_revision: str | None = None
+    source_region: str | None = None
+    source_file: str | None = None
+    source_page: int | None = None
+    original_rate: float | None = None
+
+    item_no: str | None = None
+    description: str
+    unit: str
+    quantity: float = 0.0
+    rate: float = 0.0
+    amount: float = 0.0
+    notes: str | None = None
+    sort_order: int = 0
+    is_custom: bool = False
+
+    created_at: datetime
+    updated_at: datetime
+
+    @computed_field
+    def is_modified_rate(self) -> bool:
+        if self.original_rate is not None and not self.is_custom:
+            return round(self.rate, 2) != round(self.original_rate, 2)
+        return False
+
+class MasterBOQBase(BaseModel):
+    name: str = "Master BOQ Working Workspace"
+    project_id: int | None = None
+    status: str = "ACTIVE"
+    contingency_rate: float = 0.10
+    vat_status: str = "Excluded"
+    notes: str | None = None
+
+class MasterBOQCreate(BaseModel):
+    name: str = "Master BOQ Working Workspace"
+    project_id: int | None = None
+    contingency_rate: float = 0.10
+    vat_status: str = "Excluded"
+    notes: str | None = None
+
+class MasterBOQUpdate(BaseModel):
+    name: str | None = None
+    status: str | None = None
+    contingency_rate: float | None = None
+    vat_status: str | None = None
+    notes: str | None = None
+
+class MasterBOQOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    project_id: int | None = None
+    status: str
+    contingency_rate: float
+    vat_status: str
+    notes: str | None
+    created_by: str | None
+    created_at: datetime
+    updated_at: datetime
+    items: list[MasterBOQItemOut] = []
+
+    @computed_field
+    def total_items(self) -> int:
+        return len(self.items)
+
+    @computed_field
+    def subtotal(self) -> float:
+        return round(sum(it.amount for it in self.items), 2)
+
+    @computed_field
+    def contingency_amount(self) -> float:
+        return round(self.subtotal * self.contingency_rate, 2)
+
+    @computed_field
+    def grand_total(self) -> float:
+        return round(self.subtotal + self.contingency_amount, 2)
+
+class AddRatesToBOQRequest(BaseModel):
+    rate_item_ids: list[int]
+
+class AddRatesToBOQResponse(BaseModel):
+    added_count: int
+    existing_count: int
+    items: list[MasterBOQItemOut]
+    message: str
+
+class BulkDeleteBOQItemsRequest(BaseModel):
+    item_ids: list[int]
+
+class ReorderItemEntry(BaseModel):
+    id: int
+    sort_order: int
+
+class ReorderBOQItemsRequest(BaseModel):
+    item_orders: list[ReorderItemEntry]
+
+
+# ----------------- 31-Part Canonical BSR Workflow Schemas -----------------
+
+class CanonicalBSRPartOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    part_no: str
+    part_code: str
+    part_name: str
+    aliases: str | None = None
+    description: str | None = None
+    sort_order: int = 0
+    active: bool = True
+    created_at: datetime
+    updated_at: datetime
+
+class CanonicalBSRPartUpdate(BaseModel):
+    part_name: str | None = None
+    part_code: str | None = None
+    aliases: str | None = None
+    description: str | None = None
+    sort_order: int | None = None
+    active: bool | None = None
+
+class PartYearAvailability(BaseModel):
+    year: int
+    count: int
+
+class PartLibraryItemOut(BaseModel):
+    id: int
+    part_no: str
+    part_code: str
+    part_name: str
+    description: str | None = None
+    sort_order: int = 0
+    active: bool = True
+    total_items: int = 0
+    years_available: list[int] = []
+    year_counts: dict[str, int] = {}
+
+class CrossYearRateItemOut(BaseModel):
+    id: int
+    canonical_part_id: int | None = None
+    item_code: str | None = None
+    description: str
+    unit: str
+    rate: float
+    year: int
+    revision: str
+    province: str
+    district: str
+    vat_basis: str
+    source_file_id: int | None = None
+    source_file_name: str | None = None
+    source_page: int | None = None
+    source_sheet: str | None = None
+    source_row: int | None = None
+    validation_status: str = "VALID"
+    part_mapping_status: str = "MAPPED"
+    master_item_id: int | None = None
+    master_code: str | None = None
+    canonical_description: str | None = None
+    canonical_unit: str | None = None
+    is_master_approved: bool = False
+    similarity_suggestion: str | None = None
+    similarity_score: float | None = None
+
+class CrossYearPartGroupOut(BaseModel):
+    part: CanonicalBSRPartOut
+    available_years: list[int] = []
+    items_by_year: dict[str, list[CrossYearRateItemOut]] = {}
+    master_grouped_items: list[dict[str, Any]] = []
+    total_items: int = 0
+
+class AddPartItemEntry(BaseModel):
+    rate_item_id: int
+    quantity: float = 1.0
+    adjustment_percent: float = 0.0
+    adopted_rate: float | None = None
+    rate_justification: str | None = None
+    remarks: str | None = None
+
+class AddItemsToPartSelectionRequest(BaseModel):
+    items: list[AddPartItemEntry]
+    replace_existing_master_ids: list[int] = []
+    allow_duplicates: bool = False
+
+class DuplicateItemWarningDetail(BaseModel):
+    master_item_id: int | None = None
+    item_code: str | None = None
+    existing_item_id: int
+    existing_year: str
+    existing_rate: float
+    new_rate_item_id: int
+    new_year: str
+    new_rate: float
+    description: str
+
+class DuplicateItemWarningResponse(BaseModel):
+    has_duplicates: bool
+    warnings: list[DuplicateItemWarningDetail] = []
+    message: str | None = None
+
+class ProjectPartItemHistoryOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    project_part_item_id: int
+    field_changed: str
+    old_value: str | None = None
+    new_value: str | None = None
+    changed_by: str | None = None
+    changed_at: datetime
+    reason: str | None = None
+
+class ProjectPartItemOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    project_part_selection_id: int
+    bsr_item_id: int | None = None
+    master_item_id: int | None = None
+    item_no: str | None = None
+    original_code: str | None = None
+    project_code: str | None = None
+    original_description: str
+    project_description: str
+    original_unit: str
+    project_unit: str
+    quantity: float = 0.0
+    original_rate: float = 0.0
+    adjustment_percent: float = 0.0
+    adopted_rate: float = 0.0
+    amount: float = 0.0
+    rate_source_year: str
+    rate_source_book: str | None = None
+    rate_source_province: str | None = None
+    rate_source_district: str | None = None
+    rate_source_revision: str | None = None
+    rate_source_file_id: int | None = None
+    rate_source_page: int | None = None
+    rate_source_sheet: str | None = None
+    rate_source_row: int | None = None
+    rate_justification: str | None = None
+    remarks: str | None = None
+    sort_order: int = 0
+    is_modified: bool = False
+    unit_warning_acknowledged: bool = False
+    edited_by: str | None = None
+    edited_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+    history_records: list[ProjectPartItemHistoryOut] = []
+
+class ProjectPartItemUpdate(BaseModel):
+    item_no: str | None = None
+    project_description: str | None = None
+    project_unit: str | None = None
+    quantity: float | None = None
+    adjustment_percent: float | None = None
+    adopted_rate: float | None = None
+    rate_justification: str | None = None
+    remarks: str | None = None
+    sort_order: int | None = None
+    unit_warning_acknowledged: bool | None = None
+    # Optional permission fields (manager/admin)
+    project_code: str | None = None
+    rate_source_year: str | None = None
+    rate_source_book: str | None = None
+
+class ProjectPartSelectionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    project_id: int | None = None
+    canonical_part_id: int
+    canonical_part: CanonicalBSRPartOut | None = None
+    name: str
+    status: str
+    notes: str | None = None
+    created_by: str | None = None
+    created_at: datetime
+    updated_at: datetime
+    items: list[ProjectPartItemOut] = []
+
+    @computed_field
+    def total_items(self) -> int:
+        return len(self.items)
+
+    @computed_field
+    def subtotal(self) -> float:
+        return round(sum(it.amount for it in self.items), 2)
+
+class PartTemplateMappingOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    canonical_part_id: int
+    template_id: int | None = None
+    target_sheet: str
+    title: str | None = None
+    start_row: int = 5
+    item_no_column: str | None = "A"
+    bsr_ref_column: str | None = "B"
+    description_column: str | None = "C"
+    unit_column: str | None = "D"
+    qty_column: str | None = "E"
+    original_rate_column: str | None = "F"
+    adopted_rate_column: str | None = "G"
+    amount_column: str | None = "H"
+    rate_year_column: str | None = "I"
+    rate_source_column: str | None = "J"
+    justification_column: str | None = "K"
+    remarks_column: str | None = "L"
+    column_mapping_json: str | None = None
+
+class PartTemplateMappingUpdate(BaseModel):
+    template_id: int | None = None
+    target_sheet: str | None = None
+    title: str | None = None
+    start_row: int | None = None
+    item_no_column: str | None = None
+    bsr_ref_column: str | None = None
+    description_column: str | None = None
+    unit_column: str | None = None
+    qty_column: str | None = None
+    original_rate_column: str | None = None
+    adopted_rate_column: str | None = None
+    amount_column: str | None = None
+    rate_year_column: str | None = None
+    rate_source_column: str | None = None
+    justification_column: str | None = None
+    remarks_column: str | None = None
+    column_mapping_json: str | None = None
+
+class BSRImportPartBreakdownEntry(BaseModel):
+    canonical_part_id: int | None = None
+    part_no: str
+    part_code: str
+    part_name: str
+    item_count: int
+    valid_count: int
+    review_count: int
+
+class BSRImportBreakdownOut(BaseModel):
+    source_file_id: int
+    file_name: str
+    total_extracted: int
+    total_valid: int
+    total_needs_review: int
+    total_unmapped: int
+    total_duplicate: int
+    parts_breakdown: list[BSRImportPartBreakdownEntry] = []
+
+

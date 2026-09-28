@@ -12,6 +12,21 @@ import {
   RateItemSearchResponse,
   CESMMSection,
   RateItemCESMM,
+  MasterBOQ,
+  MasterBOQItem,
+  MasterBOQCreate,
+  MasterBOQUpdate,
+  MasterBOQItemCreate,
+  MasterBOQItemUpdate,
+  AddRatesToBOQResponse,
+  CanonicalBSRPart,
+  PartLibraryItem,
+  CrossYearPartData,
+  ProjectPartItem,
+  ProjectPartSelection,
+  AddItemsResult,
+  ProjectPartItemHistoryRecord,
+  BSRImportBreakdown,
 } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
@@ -570,4 +585,212 @@ export const api = {
     ),
 
   getSystemTemplates: () => request<any[]>('/projects/system/templates'),
+
+  // Master BOQ Working Workspace
+  getActiveMasterBOQ: (projectId?: number) =>
+    request<MasterBOQ>(`/master-boqs/active${projectId ? `?project_id=${projectId}` : ''}`),
+
+  listMasterBOQs: () => request<MasterBOQ[]>('/master-boqs'),
+
+  createMasterBOQ: (data: MasterBOQCreate) =>
+    request<MasterBOQ>('/master-boqs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+
+  getMasterBOQ: (id: number) => request<MasterBOQ>(`/master-boqs/${id}`),
+
+  updateMasterBOQ: (id: number, data: MasterBOQUpdate) =>
+    request<MasterBOQ>(`/master-boqs/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+
+  deleteMasterBOQ: (id: number) =>
+    request<{ success: boolean; message: string }>(`/master-boqs/${id}`, { method: 'DELETE' }),
+
+  addRatesToMasterBOQ: (boqId: number, rateItemIds: number[]) =>
+    request<AddRatesToBOQResponse>(`/master-boqs/${boqId}/items/from-rates`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rate_item_ids: rateItemIds }),
+    }),
+
+  addCustomItemToMasterBOQ: (boqId: number, data: MasterBOQItemCreate) =>
+    request<MasterBOQItem>(`/master-boqs/${boqId}/items/custom`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+
+  updateMasterBOQItem: (boqId: number, itemId: number, data: MasterBOQItemUpdate) =>
+    request<MasterBOQItem>(`/master-boqs/${boqId}/items/${itemId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+
+  deleteMasterBOQItem: (boqId: number, itemId: number) =>
+    request<{ success: boolean; deleted_item_id: number }>(`/master-boqs/${boqId}/items/${itemId}`, {
+      method: 'DELETE',
+    }),
+
+  bulkDeleteMasterBOQItems: (boqId: number, itemIds: number[]) =>
+    request<{ success: boolean; deleted_count: number }>(`/master-boqs/${boqId}/items/bulk-delete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ item_ids: itemIds }),
+    }),
+
+  duplicateMasterBOQItem: (boqId: number, itemId: number) =>
+    request<MasterBOQItem>(`/master-boqs/${boqId}/items/${itemId}/duplicate`, {
+      method: 'POST',
+    }),
+
+  reorderMasterBOQItems: (boqId: number, itemOrders: { id: number; sort_order: number }[]) =>
+    request<{ success: boolean; message: string }>(`/master-boqs/${boqId}/reorder`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ item_orders: itemOrders }),
+    }),
+
+  downloadMasterBOQExcel: (boqId: number, filename?: string) =>
+    downloadFile(`/master-boqs/${boqId}/export/excel`, {}, filename || `Master_BOQ_${boqId}.xlsx`),
+
+  downloadMasterBOQPdf: (boqId: number, filename?: string) =>
+    downloadFile(`/master-boqs/${boqId}/export/pdf`, {}, filename || `Master_BOQ_${boqId}.pdf`),
+
+  // ── BSR 31-Part Canonical Workflow ──────────────────────────────────────
+
+  listCanonicalParts: () =>
+    request<CanonicalBSRPart[]>('/bsr-parts'),
+
+  getPartsLibrary: (params?: { district?: string; province?: string; rate_system?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.district) qs.set('district', params.district);
+    if (params?.province) qs.set('province', params.province);
+    if (params?.rate_system) qs.set('rate_system', params.rate_system);
+    return request<PartLibraryItem[]>(`/bsr-parts/library?${qs}`);
+  },
+
+  getPartCrossYear: (
+    partId: number,
+    params?: {
+      district?: string;
+      province?: string;
+      rate_system?: string;
+      vat_basis?: string;
+      years?: number[];
+      search?: string;
+      page?: number;
+      page_size?: number;
+    },
+  ) => {
+    const qs = new URLSearchParams();
+    if (params?.district) qs.set('district', params.district);
+    if (params?.province) qs.set('province', params.province);
+    if (params?.rate_system) qs.set('rate_system', params.rate_system);
+    if (params?.vat_basis) qs.set('vat_basis', params.vat_basis);
+    if (params?.years?.length) qs.set('years', params.years.join(','));
+    if (params?.search) qs.set('search', params.search);
+    if (params?.page) qs.set('page', String(params.page));
+    if (params?.page_size) qs.set('page_size', String(params.page_size));
+    return request<CrossYearPartData>(`/bsr-parts/${partId}/cross-year?${qs}`);
+  },
+
+  getImportBreakdown: (sourceFileId: number) =>
+    request<BSRImportBreakdown>(`/bsr-parts/import-breakdown/${sourceFileId}`),
+
+  classifyItems: (rateSystem = 'BSR', forceRemap = false) =>
+    request<{ success: boolean; mapped: number; needs_review: number; unchanged: number }>(
+      `/bsr-parts/classify?rate_system=${rateSystem}&force_remap=${forceRemap}`,
+      { method: 'POST' },
+    ),
+
+  seedTemplateMappings: () =>
+    request<{ success: boolean; created: number }>('/bsr-parts/seed-template-mappings', {
+      method: 'POST',
+    }),
+
+  createPartSelection: (partId: number, data?: { project_id?: number; name?: string }) =>
+    request<ProjectPartSelection>(`/bsr-parts/${partId}/selections`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data || {}),
+    }),
+
+  listPartSelections: (params?: { part_id?: number; project_id?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.part_id) qs.set('part_id', String(params.part_id));
+    if (params?.project_id) qs.set('project_id', String(params.project_id));
+    return request<ProjectPartSelection[]>(`/bsr-parts/selections?${qs}`);
+  },
+
+  getPartSelection: (selectionId: number) =>
+    request<ProjectPartSelection>(`/bsr-parts/selections/${selectionId}`),
+
+  deletePartSelection: (selectionId: number) =>
+    request<{ success: boolean; deleted_id: number }>(`/bsr-parts/selections/${selectionId}`, {
+      method: 'DELETE',
+    }),
+
+  addItemsToSelection: (
+    selectionId: number,
+    rateItemIds: number[],
+    allowDuplicates = false,
+    replaceExistingIds?: number[],
+  ) =>
+    request<AddItemsResult>(`/bsr-parts/selections/${selectionId}/items`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        rate_item_ids: rateItemIds,
+        allow_duplicates: allowDuplicates,
+        replace_existing_ids: replaceExistingIds,
+      }),
+    }),
+
+  updatePartItem: (itemId: number, data: Partial<ProjectPartItem>) =>
+    request<ProjectPartItem>(`/bsr-parts/selections/items/${itemId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+
+  duplicatePartItem: (itemId: number) =>
+    request<ProjectPartItem>(`/bsr-parts/selections/items/${itemId}/duplicate`, {
+      method: 'POST',
+    }),
+
+  removePartItem: (itemId: number) =>
+    request<{ success: boolean; removed_id: number }>(
+      `/bsr-parts/selections/items/${itemId}`,
+      { method: 'DELETE' },
+    ),
+
+  getPartItemHistory: (itemId: number) =>
+    request<ProjectPartItemHistoryRecord[]>(`/bsr-parts/selections/items/${itemId}/history`),
+
+  reorderPartItems: (selectionId: number, itemOrders: { id: number; sort_order: number }[]) =>
+    request<{ success: boolean; message: string }>(`/bsr-parts/selections/${selectionId}/reorder`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(itemOrders),
+    }),
+
+  downloadPartExcel: (selectionId: number, filename?: string) =>
+    downloadFile(
+      `/bsr-parts/selections/${selectionId}/export/excel`,
+      {},
+      filename || `BSR_Part_Selection_${selectionId}.xlsx`,
+    ),
+
+  downloadPartPdf: (selectionId: number, filename?: string) =>
+    downloadFile(
+      `/bsr-parts/selections/${selectionId}/export/pdf`,
+      {},
+      filename || `BSR_Part_Selection_${selectionId}.pdf`,
+    ),
 };

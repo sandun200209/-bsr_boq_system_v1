@@ -12,6 +12,8 @@ import {
   Download,
   ExternalLink,
   Layers,
+  ArrowRight,
+  Loader2,
 } from 'lucide-react';
 import { api } from '../api/client';
 import { RateItem, FilterOptions } from '../types';
@@ -67,6 +69,8 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
   // Copy notification state
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [copyToast, setCopyToast] = useState<string | null>(null);
+  const [boqToast, setBoqToast] = useState<{ added: number; existing: number; message: string } | null>(null);
+  const [exportingToBOQ, setExportingToBOQ] = useState<boolean>(false);
 
   // Selection state
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -276,6 +280,25 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const handleExportToMasterBOQ = async () => {
+    if (selectedIds.size === 0) return;
+    setExportingToBOQ(true);
+    try {
+      const activeBoq = await api.getActiveMasterBOQ();
+      const res = await api.addRatesToMasterBOQ(activeBoq.id, Array.from(selectedIds));
+      setBoqToast({
+        added: res.added_count,
+        existing: res.existing_count,
+        message: res.message,
+      });
+      setSelectedIds(new Set());
+    } catch (err: any) {
+      alert(`Failed to add items to Master BOQ: ${err.message || 'Unknown error'}`);
+    } finally {
+      setExportingToBOQ(false);
+    }
+  };
+
   const handleSort = (col: string) => {
     if (sortBy === col) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
@@ -289,7 +312,10 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
   // Cascading enabled / satisfied states
   const isRateBookSelected = Boolean(rateSystem);
 
-  const isYearEnabled = isRateBookSelected;
+  const isCesmmEnabled = isRateBookSelected;
+  const isCesmmSelected = Boolean(isCesmmEnabled && cesmmSectionNo);
+
+  const isYearEnabled = isCesmmSelected;
   const isYearSelected = Boolean(isYearEnabled && year);
 
   const isProvinceEnabled = isYearSelected;
@@ -298,10 +324,7 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
   const isDistrictEnabled = isProvinceSelected;
   const isDistrictSelected = Boolean(isDistrictEnabled && district);
 
-  const isCesmmEnabled = isDistrictSelected;
-  const isCesmmSelected = Boolean(isCesmmEnabled && cesmmSectionNo);
-
-  const isCategoryEnabled = isCesmmSelected;
+  const isCategoryEnabled = isDistrictSelected;
   const isCategorySelected = Boolean(isCategoryEnabled && category);
 
   const isRevisionEnabled = isCategorySelected;
@@ -320,10 +343,24 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
   // Strict Reset-on-Change handlers: each resets all downstream child filters
   const handleRateSystemChange = (val: string) => {
     setRateSystem(val);
+    setCesmmSectionNo('');
     setYear('');
     setProvince('');
     setDistrict('');
-    setCesmmSectionNo('');
+    setCategory('');
+    setRevision('');
+    setVatBasis('');
+    setSheet('');
+    setStatus('ALL');
+    setPageNumber('');
+    setPage(1);
+  };
+
+  const handleCesmmChange = (val: string) => {
+    setCesmmSectionNo(val);
+    setYear('');
+    setProvince('');
+    setDistrict('');
     setCategory('');
     setRevision('');
     setVatBasis('');
@@ -337,7 +374,6 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
     setYear(val);
     setProvince('');
     setDistrict('');
-    setCesmmSectionNo('');
     setCategory('');
     setRevision('');
     setVatBasis('');
@@ -350,7 +386,6 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
   const handleProvinceChange = (val: string) => {
     setProvince(val);
     setDistrict('');
-    setCesmmSectionNo('');
     setCategory('');
     setRevision('');
     setVatBasis('');
@@ -362,18 +397,6 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
 
   const handleDistrictChange = (val: string) => {
     setDistrict(val);
-    setCesmmSectionNo('');
-    setCategory('');
-    setRevision('');
-    setVatBasis('');
-    setSheet('');
-    setStatus('ALL');
-    setPageNumber('');
-    setPage(1);
-  };
-
-  const handleCesmmChange = (val: string) => {
-    setCesmmSectionNo(val);
     setCategory('');
     setRevision('');
     setVatBasis('');
@@ -428,10 +451,10 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
     setDebouncedSearch('');
     setSector('');
     setRateSystem('');
+    setCesmmSectionNo('');
     setYear('');
     setProvince('');
     setDistrict('');
-    setCesmmSectionNo('');
     setCategory('');
     setRevision('');
     setDatasetType('');
@@ -499,10 +522,10 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
         <div className="flex items-center gap-1.5 overflow-x-auto text-[11px] py-1 border-y border-slate-100 no-scrollbar">
           {[
             { step: 1, name: 'Rate Book', active: isRateBookSelected },
-            { step: 2, name: 'Year', active: isYearSelected },
-            { step: 3, name: 'Province', active: isProvinceSelected },
-            { step: 4, name: 'District', active: isDistrictSelected },
-            { step: 5, name: 'CESMM-SL', active: isCesmmSelected },
+            { step: 2, name: 'CESMM-SL', active: isCesmmSelected },
+            { step: 3, name: 'Year', active: isYearSelected },
+            { step: 4, name: 'Province', active: isProvinceSelected },
+            { step: 5, name: 'District', active: isDistrictSelected },
             { step: 6, name: 'Category', active: isCategorySelected },
             { step: 7, name: 'Revision', active: isRevisionSelected },
             { step: 8, name: 'VAT', active: isVatSelected },
@@ -516,7 +539,7 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
                 className={`px-1.5 py-0.5 rounded font-mono text-[10px] whitespace-nowrap transition-colors ${
                   item.active
                     ? 'bg-blue-600 text-white font-bold shadow-2xs'
-                    : (item.step === 1 || (item.step === 2 && isYearEnabled) || (item.step === 3 && isProvinceEnabled) || (item.step === 4 && isDistrictEnabled) || (item.step === 5 && isCesmmEnabled) || (item.step === 6 && isCategoryEnabled) || (item.step === 7 && isRevisionEnabled) || (item.step === 8 && isVatEnabled) || (item.step === 9 && isSheetEnabled) || (item.step === 10 && isStatusEnabled) || (item.step === 11 && isPageEnabled))
+                    : (item.step === 1 || (item.step === 2 && isCesmmEnabled) || (item.step === 3 && isYearEnabled) || (item.step === 4 && isProvinceEnabled) || (item.step === 5 && isDistrictEnabled) || (item.step === 6 && isCategoryEnabled) || (item.step === 7 && isRevisionEnabled) || (item.step === 8 && isVatEnabled) || (item.step === 9 && isSheetEnabled) || (item.step === 10 && isStatusEnabled) || (item.step === 11 && isPageEnabled))
                     ? 'bg-blue-50 text-blue-700 font-semibold border border-blue-200'
                     : 'bg-slate-100 text-slate-400 select-none'
                 }`}
@@ -541,61 +564,7 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
             ))}
           </select>
 
-          {/* 2: Year */}
-          <select
-            value={year}
-            disabled={!isYearEnabled}
-            onChange={(e) => handleYearChange(e.target.value)}
-            className={`text-xs rounded-lg py-1.5 px-2 transition-colors ${
-              isYearEnabled
-                ? 'border border-slate-300 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer font-medium'
-                : 'border border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed select-none'
-            }`}
-            title={year || (isYearEnabled ? 'Step 2: Select Year' : 'Step 2: Disabled (Select Rate Book first)')}
-          >
-            <option value="">{isYearEnabled ? '2. [Select Year]' : '2. Year (Locked)'}</option>
-            {filterOpts?.years?.map((y) => (
-              <option key={y} value={y}>{y}</option>
-            ))}
-          </select>
-
-          {/* 3: Province */}
-          <select
-            value={province}
-            disabled={!isProvinceEnabled}
-            onChange={(e) => handleProvinceChange(e.target.value)}
-            className={`text-xs rounded-lg py-1.5 px-2 transition-colors ${
-              isProvinceEnabled
-                ? 'border border-slate-300 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer font-medium'
-                : 'border border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed select-none'
-            }`}
-            title={province || (isProvinceEnabled ? 'Step 3: Select Province' : 'Step 3: Disabled (Select Year first)')}
-          >
-            <option value="">{isProvinceEnabled ? '3. [Select Province]' : '3. Province (Locked)'}</option>
-            {filterOpts?.provinces?.map((p) => (
-              <option key={p} value={p}>{p}</option>
-            ))}
-          </select>
-
-          {/* 4: District */}
-          <select
-            value={district}
-            disabled={!isDistrictEnabled}
-            onChange={(e) => handleDistrictChange(e.target.value)}
-            className={`text-xs rounded-lg py-1.5 px-2 transition-colors ${
-              isDistrictEnabled
-                ? 'border border-slate-300 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer font-medium'
-                : 'border border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed select-none'
-            }`}
-            title={district || (isDistrictEnabled ? 'Step 4: Select District' : 'Step 4: Disabled (Select Province first)')}
-          >
-            <option value="">{isDistrictEnabled ? '4. [Select District]' : '4. District (Locked)'}</option>
-            {filterOpts?.districts?.map((d) => (
-              <option key={d} value={d}>{d}</option>
-            ))}
-          </select>
-
-          {/* 5: CESMM Section */}
+          {/* 2: CESMM Section */}
           <select
             value={cesmmSectionNo}
             disabled={!isCesmmEnabled}
@@ -605,13 +574,67 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
                 ? 'border border-indigo-400 bg-indigo-50/60 text-indigo-950 focus:outline-none focus:ring-2 focus:ring-indigo-600 cursor-pointer font-semibold shadow-2xs'
                 : 'border border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed select-none'
             }`}
-            title={cesmmSectionNo ? `CESMM Section ${cesmmSectionNo}` : (isCesmmEnabled ? 'Step 5: Select CESMM Section' : 'Step 5: Disabled (Select District first)')}
+            title={cesmmSectionNo ? `CESMM Section ${cesmmSectionNo}` : (isCesmmEnabled ? 'Step 2: Select CESMM Section' : 'Step 2: Disabled (Select Rate Book first)')}
           >
-            <option value="">{isCesmmEnabled ? '5. [Select CESMM Section]' : '5. CESMM (Locked)'}</option>
+            <option value="">{isCesmmEnabled ? '2. [Select CESMM Section]' : '2. CESMM (Locked)'}</option>
             {filterOpts?.cesmm_sections?.map((cs) => (
               <option key={cs.id} value={cs.section_no}>
                 {cs.display_label || `${cs.section_no} - ${cs.name} (${cs.section_code})`}
               </option>
+            ))}
+          </select>
+
+          {/* 3: Year */}
+          <select
+            value={year}
+            disabled={!isYearEnabled}
+            onChange={(e) => handleYearChange(e.target.value)}
+            className={`text-xs rounded-lg py-1.5 px-2 transition-colors ${
+              isYearEnabled
+                ? 'border border-slate-300 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer font-medium'
+                : 'border border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed select-none'
+            }`}
+            title={year || (isYearEnabled ? 'Step 3: Select Year' : 'Step 3: Disabled (Select CESMM Section first)')}
+          >
+            <option value="">{isYearEnabled ? '3. [Select Year]' : '3. Year (Locked)'}</option>
+            {filterOpts?.years?.map((y) => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+
+          {/* 4: Province */}
+          <select
+            value={province}
+            disabled={!isProvinceEnabled}
+            onChange={(e) => handleProvinceChange(e.target.value)}
+            className={`text-xs rounded-lg py-1.5 px-2 transition-colors ${
+              isProvinceEnabled
+                ? 'border border-slate-300 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer font-medium'
+                : 'border border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed select-none'
+            }`}
+            title={province || (isProvinceEnabled ? 'Step 4: Select Province' : 'Step 4: Disabled (Select Year first)')}
+          >
+            <option value="">{isProvinceEnabled ? '4. [Select Province]' : '4. Province (Locked)'}</option>
+            {filterOpts?.provinces?.map((p) => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </select>
+
+          {/* 5: District */}
+          <select
+            value={district}
+            disabled={!isDistrictEnabled}
+            onChange={(e) => handleDistrictChange(e.target.value)}
+            className={`text-xs rounded-lg py-1.5 px-2 transition-colors ${
+              isDistrictEnabled
+                ? 'border border-slate-300 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer font-medium'
+                : 'border border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed select-none'
+            }`}
+            title={district || (isDistrictEnabled ? 'Step 5: Select District' : 'Step 5: Disabled (Select Province first)')}
+          >
+            <option value="">{isDistrictEnabled ? '5. [Select District]' : '5. District (Locked)'}</option>
+            {filterOpts?.districts?.map((d) => (
+              <option key={d} value={d}>{d}</option>
             ))}
           </select>
 
@@ -625,7 +648,7 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
                 ? 'border border-slate-300 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer font-medium'
                 : 'border border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed select-none'
             }`}
-            title={category || (isCategoryEnabled ? 'Step 6: Select Category' : 'Step 6: Disabled (Select CESMM Section first)')}
+            title={category || (isCategoryEnabled ? 'Step 6: Select Category' : 'Step 6: Disabled (Select District first)')}
           >
             <option value="">{isCategoryEnabled ? '6. [Select Category]' : '6. Category (Locked)'}</option>
             {filterOpts?.categories?.map((c) => (
@@ -790,15 +813,16 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
               </button>
 
               <button
-                onClick={() => {
-                  if (onNavigate) {
-                    onNavigate('export', { selectedIds: Array.from(selectedIds) });
-                  }
-                }}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-semibold shadow-xs transition-colors cursor-pointer"
+                onClick={handleExportToMasterBOQ}
+                disabled={exportingToBOQ}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 disabled:opacity-60 text-white font-semibold shadow-xs transition-colors cursor-pointer"
                 title="Export selected items to Master QS BOQ (.xlsx / PDF)"
               >
-                <Download className="w-3.5 h-3.5" />
+                {exportingToBOQ ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Download className="w-3.5 h-3.5" />
+                )}
                 <span>Export Master BOQ ({selectedIds.size})</span>
               </button>
 
@@ -1131,6 +1155,42 @@ export const RateSearchPage: React.FC<RateSearchPageProps> = ({
         <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 border border-slate-700 animate-in fade-in slide-in-from-bottom-4">
           <Check className="w-4 h-4 text-emerald-400 shrink-0" />
           <span className="text-xs font-medium">{copyToast}</span>
+        </div>
+      )}
+
+      {boqToast && (
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3.5 rounded-xl shadow-2xl flex items-center gap-4 border border-teal-500/40 animate-in fade-in slide-in-from-bottom-4 max-w-lg">
+          <div className="p-2 rounded-lg bg-teal-500/20 text-teal-400 shrink-0">
+            <Check className="w-4 h-4" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-white">
+              {boqToast.added} items added to Master BOQ
+            </p>
+            {boqToast.existing > 0 && (
+              <p className="text-[11px] text-amber-300">
+                ({boqToast.existing} already existed in workspace)
+              </p>
+            )}
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => {
+                setBoqToast(null);
+                if (onNavigate) onNavigate('export');
+              }}
+              className="px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white font-semibold text-xs transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
+            >
+              <span>Open Master BOQ</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setBoqToast(null)}
+              className="text-slate-400 hover:text-white p-1 rounded transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       )}
 

@@ -215,3 +215,262 @@ export interface DashboardMetrics {
   sector_files_breakdown?: { sector: string; count: number }[];
   latest_revisions: { province: string; district: string; year: number; revision: string; files: number }[];
 }
+
+export interface MasterBOQItem {
+  id: number;
+  master_boq_id: number;
+  source_rate_item_id?: number | null;
+  source_rate_book?: string | null;
+  source_code?: string | null;
+  source_category?: string | null;
+  source_cesmm_section?: string | null;
+  source_year?: number | null;
+  source_revision?: string | null;
+  source_region?: string | null;
+  source_file?: string | null;
+  source_page?: number | null;
+  original_rate?: number | null;
+
+  item_no?: string | null;
+  description: string;
+  unit: string;
+  quantity: number;
+  rate: number;
+  amount: number;
+  notes?: string | null;
+  sort_order: number;
+  is_custom: boolean;
+  is_modified_rate?: boolean;
+
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MasterBOQ {
+  id: number;
+  name: string;
+  project_id?: number | null;
+  status: string;
+  contingency_rate: number;
+  vat_status: string;
+  notes?: string | null;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+  items: MasterBOQItem[];
+  total_items?: number;
+  subtotal?: number;
+  contingency_amount?: number;
+  grand_total?: number;
+}
+
+export interface MasterBOQCreate {
+  name?: string;
+  project_id?: number | null;
+  contingency_rate?: number;
+  vat_status?: string;
+  notes?: string | null;
+}
+
+export interface MasterBOQUpdate {
+  name?: string;
+  status?: string;
+  contingency_rate?: number;
+  vat_status?: string;
+  notes?: string | null;
+}
+
+export interface MasterBOQItemCreate {
+  description: string;
+  unit: string;
+  quantity?: number;
+  rate?: number;
+  item_no?: string | null;
+  notes?: string | null;
+  is_custom?: boolean;
+}
+
+export interface MasterBOQItemUpdate {
+  item_no?: string | null;
+  description?: string | null;
+  unit?: string | null;
+  quantity?: number | null;
+  rate?: number | null;
+  notes?: string | null;
+  sort_order?: number | null;
+}
+
+export interface AddRatesToBOQResponse {
+  added_count: number;
+  existing_count: number;
+  items: MasterBOQItem[];
+  message: string;
+}
+
+// ─── BSR 31-Part Canonical Workflow ─────────────────────────────────────────
+
+export interface CanonicalBSRPart {
+  id: number;
+  part_no: string;
+  part_code: string;
+  part_name: string;
+  aliases?: string | null;
+  description?: string | null;
+  sort_order: number;
+  active: boolean;
+}
+
+export interface PartLibraryItem extends CanonicalBSRPart {
+  year_availability: Record<number, number>; // { 2023: 124, 2024: 86, ... }
+  total_items: number;
+}
+
+export interface CrossYearRateItem {
+  id: number;
+  item_code?: string | null;
+  description?: string | null;
+  unit?: string | null;
+  rate?: number | null;
+  year: number;
+  province: string;
+  district: string;
+  revision: string;
+  vat_basis: string;
+  source_page?: number | null;
+  source_sheet?: string | null;
+  source_row?: number | null;
+  source_file_id: number;
+  master_item_id?: number | null;
+  validation_status: string;
+  part_mapping_status: string;
+}
+
+export interface CrossYearPartData {
+  canonical_part_id: number;
+  total: number;
+  page: number;
+  page_size: number;
+  available_years: number[];
+  by_year: Record<number, CrossYearRateItem[]>;
+}
+
+export interface ProjectPartItemHistoryRecord {
+  id: number;
+  project_part_item_id: number;
+  field_changed: string;
+  old_value?: string | null;
+  new_value?: string | null;
+  changed_by?: string | null;
+  changed_at: string;
+  reason?: string | null;
+}
+
+export interface ProjectPartItem {
+  id: number;
+  project_part_selection_id: number;
+  bsr_item_id?: number | null;
+  master_item_id?: number | null;
+  item_no?: string | null;
+  original_code?: string | null;
+  project_code?: string | null;
+  original_description: string;
+  project_description: string;
+  original_unit: string;
+  project_unit: string;
+  quantity: number;
+  original_rate: number;
+  adjustment_percent: number;
+  adopted_rate: number;
+  amount: number;
+  rate_source_year: string;
+  rate_source_book?: string | null;
+  rate_source_province?: string | null;
+  rate_source_district?: string | null;
+  rate_source_revision?: string | null;
+  rate_source_file_id?: number | null;
+  rate_source_page?: number | null;
+  rate_source_sheet?: string | null;
+  rate_source_row?: number | null;
+  rate_justification?: string | null;
+  remarks?: string | null;
+  sort_order: number;
+  is_modified: boolean;
+  unit_warning_acknowledged: boolean;
+  edited_by?: string | null;
+  edited_at?: string | null;
+  created_at: string;
+  updated_at: string;
+  history_records?: ProjectPartItemHistoryRecord[];
+}
+
+export interface ProjectPartSelection {
+  id: number;
+  project_id?: number | null;
+  canonical_part_id: number;
+  canonical_part?: CanonicalBSRPart | null;
+  name: string;
+  status: string;
+  notes?: string | null;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+  items: ProjectPartItem[];
+  total_items?: number;
+  subtotal?: number;
+}
+
+export interface DuplicateWarning {
+  master_item_id?: number | null;
+  existing_selection_item_id: number;
+  existing_rate_year: string;
+  new_rate_item_id: number;
+  new_rate_year: string;
+}
+
+export interface AddItemsResult {
+  added_count: number;
+  duplicates_skipped: number;
+  warnings: DuplicateWarning[];
+}
+
+export interface PartTemplateMappingOut {
+  id: number;
+  canonical_part_id: number;
+  template_id?: number | null;
+  target_sheet: string;
+  title?: string | null;
+  start_row: number;
+  item_no_column?: string | null;
+  bsr_ref_column?: string | null;
+  description_column?: string | null;
+  unit_column?: string | null;
+  qty_column?: string | null;
+  original_rate_column?: string | null;
+  adopted_rate_column?: string | null;
+  amount_column?: string | null;
+  rate_year_column?: string | null;
+  rate_source_column?: string | null;
+  justification_column?: string | null;
+  remarks_column?: string | null;
+}
+
+export interface BSRImportPartBreakdown {
+  canonical_part_id?: number | null;
+  part_no: string;
+  part_code: string;
+  part_name: string;
+  item_count: number;
+  valid_count: number;
+  review_count: number;
+}
+
+export interface BSRImportBreakdown {
+  source_file_id: number;
+  file_name: string;
+  total_extracted: number;
+  total_valid: number;
+  total_needs_review: number;
+  total_unmapped: number;
+  total_duplicate: number;
+  parts_breakdown: BSRImportPartBreakdown[];
+}

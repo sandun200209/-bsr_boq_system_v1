@@ -15,6 +15,7 @@ import { UserManagementPage } from './pages/UserManagementPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ExportReportPage } from './pages/ExportReportPage';
 import { ProjectsPage } from './pages/ProjectsPage';
+import { BSRPartsPage } from './pages/BSRPartsPage';
 import { api } from './api/client';
 import { HardHat, Loader2 } from 'lucide-react';
 
@@ -128,6 +129,7 @@ const MainApp: React.FC = () => {
             <DashboardPage onNavigate={handleNavigate} />
           )}
           {activeTab === 'projects' && <ProjectsPage />}
+          {activeTab === 'bsr-parts' && <BSRPartsPage />}
           {activeTab === 'import' && (
             <ImportCenterPage
               onNavigate={handleNavigate}
@@ -149,7 +151,12 @@ const MainApp: React.FC = () => {
               onNavigate={handleNavigate}
             />
           )}
-          {activeTab === 'export' && <ExportReportPage />}
+          {activeTab === 'export' && (
+            <ExportReportPage
+              navigationParams={navigationParams}
+              onNavigate={handleNavigate}
+            />
+          )}
           {activeTab === 'sources' && (
             <SourceFilesPage
               onNavigateToReview={(fileId) => handleNavigate('review', { source_file_id: fileId })}

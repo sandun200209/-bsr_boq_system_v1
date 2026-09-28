@@ -100,6 +100,24 @@ class ImportJob(Base):
 
     source_file: Mapped["SourceFile"] = relationship(back_populates="import_jobs")
 
+class CanonicalBSRPart(Base):
+    __tablename__ = "canonical_bsr_parts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    part_no: Mapped[str] = mapped_column(String(10), unique=True, index=True)  # e.g. "01", "02", ..., "31"
+    part_code: Mapped[str] = mapped_column(String(20), index=True)  # e.g. "DM", "EW", "BK", etc.
+    part_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    aliases: Mapped[str | None] = mapped_column(Text, nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, index=True)
+    active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    rate_items: Mapped[list["RateItem"]] = relationship(back_populates="canonical_part")
+    template_mappings: Mapped[list["PartTemplateMapping"]] = relationship(back_populates="canonical_part", cascade="all, delete-orphan")
+
 class MasterItem(Base):
     __tablename__ = "master_items"
 
@@ -107,6 +125,9 @@ class MasterItem(Base):
     master_code: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     canonical_description: Mapped[str] = mapped_column(Text, nullable=False)
     canonical_unit: Mapped[str] = mapped_column(String(100), nullable=False)
+    canonical_part_id: Mapped[int | None] = mapped_column(
+        ForeignKey("canonical_bsr_parts.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     category: Mapped[str | None] = mapped_column(String(500), nullable=True, index=True)
     sector: Mapped[str] = mapped_column(String(100), default="Building Works", server_default="Building Works", index=True)
     rate_system: Mapped[str | None] = mapped_column(String(100), default="BSR", server_default="BSR", nullable=True, index=True)
@@ -117,6 +138,7 @@ class MasterItem(Base):
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
+    canonical_part: Mapped["CanonicalBSRPart | None"] = relationship()
     mappings: Mapped[list["RateItemMasterMapping"]] = relationship(
         back_populates="master_item", cascade="all, delete-orphan"
     )
@@ -140,6 +162,14 @@ class RateItem(Base):
 
     category_code: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     category_name: Mapped[str | None] = mapped_column(String(500), nullable=True, index=True)
+
+    # Canonical 31-Part Classification
+    canonical_part_id: Mapped[int | None] = mapped_column(
+        ForeignKey("canonical_bsr_parts.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    part_mapping_status: Mapped[str] = mapped_column(
+        String(40), default="UNMAPPED", index=True
+    )  # MAPPED, NEEDS_REVIEW, UNMAPPED
 
     item_code: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -171,6 +201,7 @@ class RateItem(Base):
 
     # Relationships
     source_file: Mapped["SourceFile"] = relationship(back_populates="rate_items")
+    canonical_part: Mapped["CanonicalBSRPart | None"] = relationship(back_populates="rate_items")
     master_item: Mapped["MasterItem | None"] = relationship()
     master_mapping: Mapped["RateItemMasterMapping | None"] = relationship(
         back_populates="rate_item", cascade="all, delete-orphan", uselist=False
@@ -277,7 +308,10 @@ class BSRBook(Base):
     province: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
     district: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
     year: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    period: Mapped[str | None] = mapped_column(String(50), default="Annual", nullable=True)
     revision: Mapped[str] = mapped_column(String(120), default="Original")
+    vat_basis: Mapped[str] = mapped_column(String(80), default="Without VAT", index=True)
+    source_authority: Mapped[str | None] = mapped_column(String(255), nullable=True)
     effective_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
     source_file_id: Mapped[int | None] = mapped_column(ForeignKey("source_files.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -293,16 +327,26 @@ class BSRItem(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     book_id: Mapped[int | None] = mapped_column(ForeignKey("bsr_books.id", ondelete="SET NULL"), nullable=True, index=True)
     rate_item_id: Mapped[int | None] = mapped_column(ForeignKey("rate_items.id", ondelete="CASCADE"), nullable=True, index=True)
+    canonical_part_id: Mapped[int | None] = mapped_column(
+        ForeignKey("canonical_bsr_parts.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     item_code: Mapped[str] = mapped_column(String(255), index=True)
     description: Mapped[str] = mapped_column(Text, nullable=False)
     unit: Mapped[str] = mapped_column(String(100), nullable=False)
     rate: Mapped[float] = mapped_column(Float, default=0.0)
     category_name: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    source_page: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source_sheet: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    source_row: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source_raw_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    validation_status: Mapped[str] = mapped_column(String(40), default="VALID", index=True)
+    part_mapping_status: Mapped[str] = mapped_column(String(40), default="UNMAPPED", index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     # Relationships
     book: Mapped["BSRBook | None"] = relationship(back_populates="items")
     rate_item: Mapped["RateItem | None"] = relationship()
+    canonical_part: Mapped["CanonicalBSRPart | None"] = relationship()
 
 
 class ItemMatch(Base):
@@ -312,7 +356,11 @@ class ItemMatch(Base):
     master_item_id: Mapped[int] = mapped_column(ForeignKey("master_items.id", ondelete="CASCADE"), index=True)
     bsr_item_id: Mapped[int | None] = mapped_column(ForeignKey("rate_items.id", ondelete="CASCADE"), nullable=True, index=True)
     confidence: Mapped[float] = mapped_column(Float, default=1.0)
+    match_score: Mapped[float] = mapped_column(Float, default=1.0)
     match_type: Mapped[str] = mapped_column(String(50), default="MANUAL")  # EXACT, SEMANTIC, MANUAL, HISTORICAL
+    match_method: Mapped[str] = mapped_column(String(50), default="CODE_EXACT")
+    approved: Mapped[bool] = mapped_column(Boolean, default=False)
+    approved_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
     match_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
@@ -501,4 +549,201 @@ class TemplateMapping(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     template: Mapped["Template"] = relationship(back_populates="mappings")
+
+
+# ---------------------------------------------------------------------------
+# 31-Part Canonical BSR Workflow Models
+# ---------------------------------------------------------------------------
+
+class ProjectPartSelection(Base):
+    __tablename__ = "project_part_selections"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    project_id: Mapped[int | None] = mapped_column(ForeignKey("projects.id", ondelete="SET NULL"), nullable=True, index=True)
+    canonical_part_id: Mapped[int] = mapped_column(ForeignKey("canonical_bsr_parts.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(255), default="Selected Part BOQ", index=True)
+    status: Mapped[str] = mapped_column(String(50), default="ACTIVE", index=True)  # ACTIVE, DRAFT, FINALIZED
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    project: Mapped["Project | None"] = relationship()
+    canonical_part: Mapped["CanonicalBSRPart"] = relationship()
+    items: Mapped[list["ProjectPartItem"]] = relationship(
+        back_populates="part_selection", cascade="all, delete-orphan", order_by="ProjectPartItem.sort_order"
+    )
+
+
+class ProjectPartItem(Base):
+    __tablename__ = "project_part_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    project_part_selection_id: Mapped[int] = mapped_column(ForeignKey("project_part_selections.id", ondelete="CASCADE"), index=True)
+    bsr_item_id: Mapped[int | None] = mapped_column(ForeignKey("rate_items.id", ondelete="SET NULL"), nullable=True, index=True)
+    master_item_id: Mapped[int | None] = mapped_column(ForeignKey("master_items.id", ondelete="SET NULL"), nullable=True, index=True)
+
+    item_no: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
+    # Traceability & Dual Storage: Original vs Project
+    original_code: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    project_code: Mapped[str | None] = mapped_column(String(100), nullable=True)
+
+    original_description: Mapped[str] = mapped_column(Text, nullable=False)
+    project_description: Mapped[str] = mapped_column(Text, nullable=False)
+
+    original_unit: Mapped[str] = mapped_column(String(50), nullable=False)
+    project_unit: Mapped[str] = mapped_column(String(50), nullable=False)
+
+    quantity: Mapped[float] = mapped_column(Float, default=0.0)
+    original_rate: Mapped[float] = mapped_column(Float, default=0.0)
+    adjustment_percent: Mapped[float] = mapped_column(Float, default=0.0)
+    adopted_rate: Mapped[float] = mapped_column(Float, default=0.0)
+    amount: Mapped[float] = mapped_column(Float, default=0.0)
+
+    # Rate Source Provenance
+    rate_source_year: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    rate_source_book: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    rate_source_province: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    rate_source_district: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    rate_source_revision: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    rate_source_file_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    rate_source_page: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    rate_source_sheet: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    rate_source_row: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    rate_justification: Mapped[str | None] = mapped_column(Text, nullable=True)
+    remarks: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, index=True)
+
+    # Modification flags & Audit
+    is_modified: Mapped[bool] = mapped_column(Boolean, default=False)
+    unit_warning_acknowledged: Mapped[bool] = mapped_column(Boolean, default=False)
+    edited_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    edited_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    part_selection: Mapped["ProjectPartSelection"] = relationship(back_populates="items")
+    bsr_item: Mapped["RateItem | None"] = relationship()
+    master_item: Mapped["MasterItem | None"] = relationship()
+    history_records: Mapped[list["ProjectPartItemHistory"]] = relationship(
+        back_populates="project_item", cascade="all, delete-orphan", order_by="ProjectPartItemHistory.changed_at.desc()"
+    )
+
+
+class ProjectPartItemHistory(Base):
+    __tablename__ = "project_part_item_history"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    project_part_item_id: Mapped[int] = mapped_column(ForeignKey("project_part_items.id", ondelete="CASCADE"), index=True)
+    field_changed: Mapped[str] = mapped_column(String(100), nullable=False)
+    old_value: Mapped[str | None] = mapped_column(Text, nullable=True)
+    new_value: Mapped[str | None] = mapped_column(Text, nullable=True)
+    changed_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    changed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    project_item: Mapped["ProjectPartItem"] = relationship(back_populates="history_records")
+
+
+class PartTemplateMapping(Base):
+    __tablename__ = "part_template_mappings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    canonical_part_id: Mapped[int] = mapped_column(ForeignKey("canonical_bsr_parts.id", ondelete="CASCADE"), index=True)
+    template_id: Mapped[int | None] = mapped_column(ForeignKey("templates.id", ondelete="SET NULL"), nullable=True, index=True)
+    target_sheet: Mapped[str] = mapped_column(String(255), nullable=False)
+    title: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    start_row: Mapped[int] = mapped_column(Integer, default=5)
+
+    item_no_column: Mapped[str | None] = mapped_column(String(10), default="A")
+    bsr_ref_column: Mapped[str | None] = mapped_column(String(10), default="B")
+    description_column: Mapped[str | None] = mapped_column(String(10), default="C")
+    unit_column: Mapped[str | None] = mapped_column(String(10), default="D")
+    qty_column: Mapped[str | None] = mapped_column(String(10), default="E")
+    original_rate_column: Mapped[str | None] = mapped_column(String(10), default="F")
+    adopted_rate_column: Mapped[str | None] = mapped_column(String(10), default="G")
+    amount_column: Mapped[str | None] = mapped_column(String(10), default="H")
+    rate_year_column: Mapped[str | None] = mapped_column(String(10), default="I")
+    rate_source_column: Mapped[str | None] = mapped_column(String(10), default="J")
+    justification_column: Mapped[str | None] = mapped_column(String(10), default="K")
+    remarks_column: Mapped[str | None] = mapped_column(String(10), default="L")
+    column_mapping_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    canonical_part: Mapped["CanonicalBSRPart"] = relationship(back_populates="template_mappings")
+    template: Mapped["Template | None"] = relationship()
+
+
+# ---------------------------------------------------------------------------
+# Master BOQ Working Workspace Models
+# ---------------------------------------------------------------------------
+
+class MasterBOQ(Base):
+    __tablename__ = "master_boqs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(255), default="Master BOQ Working Workspace", index=True)
+    project_id: Mapped[int | None] = mapped_column(ForeignKey("projects.id", ondelete="SET NULL"), nullable=True, index=True)
+    status: Mapped[str] = mapped_column(String(50), default="ACTIVE", index=True)  # ACTIVE, DRAFT, ARCHIVED
+    contingency_rate: Mapped[float] = mapped_column(Float, default=0.10)
+    vat_status: Mapped[str] = mapped_column(String(50), default="Excluded")  # Excluded, Included
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    project: Mapped["Project | None"] = relationship()
+    items: Mapped[list["MasterBOQItem"]] = relationship(
+        back_populates="master_boq", cascade="all, delete-orphan", order_by="MasterBOQItem.sort_order"
+    )
+
+
+class MasterBOQItem(Base):
+    __tablename__ = "master_boq_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    master_boq_id: Mapped[int] = mapped_column(ForeignKey("master_boqs.id", ondelete="CASCADE"), index=True)
+
+    # Traceability link to original RateItem
+    source_rate_item_id: Mapped[int | None] = mapped_column(
+        ForeignKey("rate_items.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+
+    # Source metadata snapshot (read-only references)
+    source_rate_book: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+    source_code: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+    source_category: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    source_cesmm_section: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    source_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source_revision: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    source_region: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    source_file: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    source_page: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    original_rate: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    # Working BOQ line-item editable fields (DO NOT MUTATE RATE_ITEMS)
+    item_no: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    unit: Mapped[str] = mapped_column(String(50), nullable=False)
+    quantity: Mapped[float] = mapped_column(Float, default=0.0)
+    rate: Mapped[float] = mapped_column(Float, default=0.0)
+    amount: Mapped[float] = mapped_column(Float, default=0.0)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    is_custom: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    master_boq: Mapped["MasterBOQ"] = relationship(back_populates="items")
+    source_rate_item: Mapped["RateItem | None"] = relationship()
+
 

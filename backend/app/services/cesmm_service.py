@@ -1,5 +1,6 @@
 from __future__ import annotations
 import logging
+from typing import Any
 from datetime import datetime
 from sqlalchemy import select, delete, and_, or_
 from sqlalchemy.orm import Session, selectinload, joinedload
@@ -47,7 +48,7 @@ CESMM_SL_31_SECTIONS = [
 def seed_cesmm_sections(db: Session) -> list[CESMMSection]:
     """
     Seeds the 31 standard CESMM-SL Work Sections into the database if not present.
-    Also maps initial baseline items across BSR, HSR, and Water to verify acceptance criteria.
+    Also maps baseline items and classifies imported rate items.
     """
     existing_sections = {s.section_no: s for s in db.scalars(select(CESMMSection)).all()}
     created = 0
@@ -76,7 +77,204 @@ def seed_cesmm_sections(db: Session) -> list[CESMMSection]:
     # Baseline seed mappings for testing & immediate usability
     seed_baseline_cesmm_mappings(db, all_sections)
 
+    # Classify any unmapped rate items across imported datasets (e.g. BSR Matara)
+    classify_and_map_imported_rate_items(db, force_remap=False)
+
     return list(all_sections.values())
+
+
+def classify_rate_item(item_code: str, category_name: str = "", description: str = "") -> list[tuple[str, bool]]:
+    """
+    Infers matching CESMM-SL work section numbers for a rate item based on
+    item code prefixes, category names, and descriptions.
+    Returns a list of (section_no, is_primary) tuples.
+    """
+    code = (item_code or "").strip().upper()
+    cat = (category_name or "").lower()
+    desc = (description or "").lower()
+
+    # If code is numeric serial and description is a trade code abbreviation (e.g. BSR index rows: '01' 'DM')
+    trade_codes = {
+        "DM", "EW", "BK", "CT", "CTR", "FW", "RF", "RR", "CB", "PA", "PL",
+        "TN", "RO", "CP", "IR", "BF", "PT", "PB", "MA", "TG", "GL",
+        "CL", "GW", "AL", "ALN", "ALB", "ALP", "EL"
+    }
+    if code.isdigit() and desc.strip().upper() in trade_codes:
+        code = desc.strip().upper()
+
+    full_text = f"{code} {cat} {desc}"
+
+    # 1. Demolition and site clearance -> 04 (D)
+    if code.startswith("DM") or "demolish" in full_text or "site clearance" in full_text:
+        return [("04", True)]
+
+    # 2. Earth works -> 05 (E)
+    if code.startswith("EW") or "excavat" in full_text or "earth work" in full_text or "trench" in full_text:
+        return [("05", True)]
+
+    # 3. Concrete work: Form work (09), Reinforcement (10), In-situ concrete (08)
+    if code.startswith("FW") or "formwork" in full_text or "shutter" in full_text:
+        return [("09", True)]
+
+    if code.startswith("RF") or "tor steel" in full_text or "reinforc" in full_text or "fabric reinforc" in full_text or "brc mesh" in full_text:
+        return [("10", True)]
+
+    if code.startswith("CT") or code.startswith("CTR") or "concrete" in full_text:
+        return [("08", True)]
+
+    # 4. Brickwork, block work and masonry -> 26 (S)
+    if code.startswith("BK") or code.startswith("RR") or code.startswith("CB") or "brick" in full_text or "rubble" in full_text or "block work" in full_text or "masonry" in full_text:
+        return [("26", True)]
+
+    # 5. Carpenter / Timber -> 19 (M)
+    if code.startswith("CP") or "carpenter" in full_text or "timber" in full_text or "plywood" in full_text:
+        return [("19", True)]
+
+    # 6. Paving / Roads -> 23 (P)
+    if code.startswith("PA") or "paving" in full_text or "road" in full_text or "asphalt" in full_text or "kerb" in full_text or "interlocking" in full_text:
+        return [("23", True)]
+
+    # 7. Painter -> 27 (T)
+    if code.startswith("PT") or "paint" in full_text or "varnish" in full_text or "enamel" in full_text or "emulsion" in full_text or "distemper" in full_text:
+        return [("27", True)]
+
+    # 8. Waterproofing -> 28 (U)
+    if "waterproof" in full_text or "damp proof" in full_text or "dpc" in full_text:
+        return [("28", True)]
+
+    # 9. Plumber / Pipe work -> 12 (Pipes), 13 (Fittings), 14 (Valves), 15 (Manholes), 16 (Supports)
+    if code.startswith("PB") or "plumber" in cat or "pipe" in cat:
+        if any(w in full_text for w in ["valve", "tap", "cock", "bib", "pillar", "stop cock", "ball valve", "cistern", "flush", "shower", "bidet", "sink", "wash basin", "urinal", "water closet", "commode", "gulley", "trap"]):
+            if any(w in full_text for w in ["manhole", "gully", "chamber", "catchpit", "inspection chamber"]):
+                return [("15", True)]
+            return [("14", True)]
+        if any(w in full_text for w in ["bend", "elbow", "tee", "socket", "union", "nipple", "reducer", "flange", "coupling", "adaptor"]):
+            return [("13", True)]
+        if any(w in full_text for w in ["bracket", "clip", "support", "hanger", "strap"]):
+            return [("16", True)]
+        return [("12", True)]
+
+    # 10. Iron work / Smith -> 17 (K - Structural) or 18 (L - Misc)
+    if code.startswith("IR") or code.startswith("TN") or code.startswith("BF"):
+        if any(w in full_text for w in ["structural", "stanchion", "girder", "truss", "rafter", "purlin", "steel work", "rsj"]):
+            return [("17", True)]
+        return [("18", True)]
+
+    # 11. Glazier -> 31 (X - simple building works)
+    if code.startswith("GL") or code.startswith("TG") or "glass" in full_text or "glaz" in full_text:
+        return [("31", True)]
+
+    # 12. Aluminium -> 31 (X)
+    if code.startswith("AL") or "aluminium" in full_text:
+        return [("31", True)]
+
+    # 13. Plasterer -> 31 (X)
+    if code.startswith("PL") or "plaster" in full_text or "rendering" in full_text:
+        return [("31", True)]
+
+    # 14. Roofer / Ceiling -> 31 (X)
+    if code.startswith("RO") or code.startswith("CL") or "roof" in full_text or "ceiling" in full_text or "asbestos" in full_text or "tile" in full_text:
+        return [("31", True)]
+
+    # 15. Electrical -> 31 (X)
+    if code.startswith("EL") or "electric" in full_text or "wiring" in full_text or "conduit" in full_text or "switch" in full_text:
+        return [("31", True)]
+
+    # 16. Mason / Misc -> 29 (V - Miscellaneous work)
+    if code.startswith("MA") or code.startswith("GW"):
+        return [("29", True)]
+
+    # 17. Fallback keywords
+    if "demolition" in full_text:
+        return [("04", True)]
+    if "excavat" in full_text or "earth" in full_text:
+        return [("05", True)]
+    if "pipe" in full_text:
+        return [("12", True)]
+    if "masonry" in full_text or "brick" in full_text:
+        return [("26", True)]
+    if "metal" in full_text or "steel" in full_text:
+        return [("18", True)]
+
+    return []
+
+
+def classify_and_map_imported_rate_items(db: Session, force_remap: bool = False) -> dict[str, Any]:
+    """
+    Scans all rate items in the database and assigns appropriate CESMM-SL work sections.
+    If force_remap is False, only items currently lacking any CESMM mapping are processed.
+    Returns classification summary statistics.
+    """
+    from collections import Counter
+
+    # Lookup all CESMM sections by section_no
+    sections_by_no = {
+        s.section_no: s
+        for s in db.scalars(select(CESMMSection)).all()
+    }
+    if not sections_by_no:
+        logger.warning("No CESMM sections found in database when running classification.")
+        return {"total_items": 0, "mapped_items": 0, "unmapped_items": 0, "by_section": {}}
+
+    if force_remap:
+        db.execute(delete(RateItemCESMMSection))
+        db.commit()
+
+    # Query items to classify
+    if force_remap:
+        items = db.scalars(select(RateItem)).all()
+    else:
+        # Items without existing mappings
+        subq = select(RateItemCESMMSection.rate_item_id).distinct()
+        items = db.scalars(select(RateItem).where(~RateItem.id.in_(subq))).all()
+
+    total_count = len(items)
+    mapped_count = 0
+    unmapped_count = 0
+    by_section: Counter[str] = Counter()
+    unmapped_examples: list[dict[str, str]] = []
+
+    mappings_to_add: list[RateItemCESMMSection] = []
+
+    for item in items:
+        inferred = classify_rate_item(item.item_code, item.category_name, item.description)
+        if inferred:
+            mapped_count += 1
+            for sec_no, is_primary in inferred:
+                sec = sections_by_no.get(sec_no)
+                if sec:
+                    mappings_to_add.append(
+                        RateItemCESMMSection(
+                            rate_item_id=item.id,
+                            cesmm_section_id=sec.id,
+                            is_primary=is_primary,
+                            created_at=datetime.utcnow(),
+                        )
+                    )
+                    by_section[sec_no] += 1
+        else:
+            unmapped_count += 1
+            if len(unmapped_examples) < 10:
+                unmapped_examples.append({
+                    "id": item.id,
+                    "item_code": item.item_code,
+                    "category": item.category_name or "",
+                    "description": (item.description or "")[:80],
+                })
+
+    if mappings_to_add:
+        # Batch insert
+        db.bulk_save_objects(mappings_to_add)
+        db.commit()
+        logger.info(f"Classified and mapped {len(mappings_to_add)} CESMM mappings for {mapped_count} rate items.")
+
+    return {
+        "total_items": total_count,
+        "mapped_items": mapped_count,
+        "unmapped_items": unmapped_count,
+        "by_section": dict(sorted(by_section.items())),
+        "unmapped_examples": unmapped_examples,
+    }
 
 
 def seed_baseline_cesmm_mappings(db: Session, sections_by_no: dict[str, CESMMSection]):

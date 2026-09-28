@@ -12,10 +12,12 @@ interface HeaderProps {
 
 const TAB_TITLES: Record<string, string> = {
   dashboard: 'Executive Dashboard & BSR Overview',
+  projects: 'Project Estimating & Historical Rates',
   import: 'Import Center – Document Pipeline',
   search: 'Rate Search & Explorer',
   compare: 'Cross-Provincial Rate Matrix',
   review: 'Verification & Review Queue',
+  export: 'QS Engineering Reports & Master BOQ Workspace',
   sources: 'Source Archive & Cloud Storage',
   master: 'Canonical Master Item Registry',
   users: 'User Management & Audit Trail',
